@@ -3917,8 +3917,8 @@ function construirVistaCliente(p) {
           '<div style="padding:8px 14px 4px;font-size:10px;color:#7a8aaa;letter-spacing:1.5px;text-transform:uppercase;">'+((p.grupos||[]).length)+' GRUPOS</div>' +
           sidebarGrupos +
         '</div>' +
-        '<div id="cMapa" style="flex:1;min-width:0;"></div>' +
-        '<div id="cPanel" style="width:340px;background:#131c2e;border-left:1px solid #253050;overflow-y:auto;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+        '<div id="cMapa" style="flex:1;min-width:220px;max-width:45%;"></div>' +
+        '<div id="cPanel" style="flex:1.4;min-width:300px;background:#131c2e;border-left:1px solid #253050;overflow-y:auto;display:flex;align-items:flex-start;justify-content:flex-start;flex-direction:column;">' +
           '<div style="text-align:center;color:#7a8aaa;padding:32px;">' +
             '<div style="font-size:36px;margin-bottom:12px;">📍</div>' +
             '<div style="font-size:13px;">Seleccioná un grupo del sidebar o tocá un punto del mapa</div>' +
@@ -4029,7 +4029,7 @@ function mostrarPanelGrupoCliente(g) {
       (g.lat ? '<div style="font-size:11px;color:#7a8aaa;margin-top:3px;">'+g.lat.toFixed(5)+', '+g.lng.toFixed(5)+(g.alt?' · '+g.alt.toFixed(1)+'m':'')+'</div>' : '') +
     '</div>' +
     // Fotos con hallazgos
-    '<div style="padding:12px;">';
+    '<div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;width:100%;box-sizing:border-box;">';
 
   (g.fotos||[]).forEach(function(f) {
     // Resolver URL de imagen desde Supabase Storage
@@ -4048,17 +4048,18 @@ function mostrarPanelGrupoCliente(g) {
     if (!imgFullSrc) { imgFullSrc = imgSrc; }
 
     var fHalls = (f.hallazgos||[]);
-    html += '<div style="border:1px solid #253050;border-radius:8px;overflow:hidden;margin-bottom:12px;background:#1a2540;">';
+    html += '<div style="border:1px solid #253050;border-radius:8px;overflow:hidden;background:#1a2540;">';
 
     // Foto thumbnail con placeholder si no carga
     if (imgSrc) {
       var hallsJson = encodeURIComponent(JSON.stringify(fHalls));
-      html += '<div style="position:relative;">' +
-        '<img src="'+imgSrc+'" style="width:100%;height:180px;object-fit:cover;display:block;cursor:zoom-in;border-radius:0;" ' +
+      var hasBbox = fHalls.some(function(h){return h.bbox;});
+      html += '<div style="position:relative;background:#0c1220;">' +
+        '<img src="'+imgSrc+'" style="width:100%;height:200px;object-fit:cover;display:block;cursor:zoom-in;" ' +
           'data-full="'+(imgFullSrc||imgSrc)+'" data-halls="'+hallsJson+'" onclick="abrirFotoClienteEvt(this)" ' +
-          'onerror="this.outerHTML=\'<div style=\\\"height:80px;background:#1a2540;display:flex;align-items:center;justify-content:center;color:#7a8aaa;font-size:24px;\\\">📷</div>\'">' +
-        '<div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:2px 7px;border-radius:3px;">🔍 Ver foto</div>' +
-        (fHalls.some(function(h){return h.bbox;}) ? '<div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.6);color:#f97316;font-size:10px;padding:2px 7px;border-radius:3px;">📌 Hallazgo marcado</div>' : '') +
+          'onerror="this.style.display=\'none\'">' +
+        '<div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.65);color:#fff;font-size:10px;padding:2px 8px;border-radius:3px;">🔍 Ver foto</div>' +
+        (hasBbox ? '<div style="position:absolute;top:6px;left:6px;background:rgba(249,115,22,0.85);color:#fff;font-size:10px;padding:2px 7px;border-radius:3px;">📌 Marcado</div>' : '') +
       '</div>';
     } else {
       html += '<div style="height:60px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:22px;">📷</div>';
