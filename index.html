@@ -853,10 +853,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
       <div class="form-row">
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">Piloto RPA</label>
-          <select class="form-select" id="fPiloto" onchange="actualizarCertAnac()">
-            <option value="Emanuel Sorribe">Emanuel Sorribe</option>
-            <option value="otro">Otro piloto...</option>
-          </select>
+          <input class="form-input" id="fPiloto" type="text" placeholder="Nombre del piloto" value="Emanuel Sorribe" oninput="actualizarCertAnac()">
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">Certificación ANAC</label>
@@ -915,10 +912,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
       <div class="form-row">
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">Piloto RPA</label>
-          <select class="form-select" id="ePiloto">
-            <option value="Emanuel Sorribe">Emanuel Sorribe</option>
-            <option value="otro">Otro piloto...</option>
-          </select>
+          <input class="form-input" id="ePiloto" type="text" placeholder="Nombre del piloto">
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">Certificación ANAC</label>
@@ -1601,9 +1595,11 @@ function actualizarMatriculaEdit() {
   document.getElementById('eMatricula').value = MATRICULAS[eq] || '';
 }
 function actualizarCertAnac() {
-  var piloto = document.getElementById('fPiloto').value;
+  var piloto = document.getElementById('fPiloto').value.trim();
   if (piloto === 'Emanuel Sorribe') {
     document.getElementById('fCertAnac').value = 'RAAC 100/101/102';
+  } else if (piloto === '') {
+    document.getElementById('fCertAnac').value = '';
   }
 }
 
@@ -4187,6 +4183,8 @@ function generarPDFGrupoCliente(gi) {
     pdfText(doc, proyectoActual.nombre, margin, y, { size:18, style:'bold', color:[15,23,42] }); y += 8;
     pdfText(doc, tax.label.toUpperCase()+' · '+g.nombre, margin, y, { size:10, color:[21,101,192] }); y += 6;
     if (proyectoActual.cliente) { pdfText(doc, proyectoActual.cliente, margin, y, { size:9, color:[100,116,139] }); y += 5; }
+    var fechaClientePDF = proyectoActual.fechaVuelo ? new Date(proyectoActual.fechaVuelo+'T12:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'}) : new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'});
+    pdfText(doc, fechaClientePDF, margin, y, { size:9, color:[100,116,139] }); y += 5;
 
     // Separador
     doc.setDrawColor(226,232,240); doc.setLineWidth(0.3);
