@@ -3266,12 +3266,12 @@ function pdfGrupo(doc, grupo, tipo, W, margin, cW) {
         try {
           doc.saveGraphicsState();
           doc.setGState(new doc.GState({opacity:0.5}));
-          doc.setFontSize(hasCritOrAlto ? 8 : 6);
+          doc.setFontSize(hasCritOrAlto ? 13 : 10);
           doc.setFont('helvetica','bold');
           doc.setTextColor(255,255,255);
           var wmTxt = 'pewmadrone.com';
           var wmW = doc.getTextWidth(wmTxt);
-          doc.text(wmTxt, imgX + imgW - wmW - 2, y + imgH - 2);
+          doc.text(wmTxt, imgX + imgW - wmW - 3, y + imgH - 3.5);
           doc.restoreGraphicsState();
           doc.setTextColor(0,0,0); // reset
         } catch(we) {}
@@ -3452,8 +3452,7 @@ function pdfResumen(doc, tipo, W, margin, cW) {
   // Badge Pewma
   pdfRect(doc, 0, 284, W, 13, [13,17,23]);
   pdfRect(doc, 0, 284, W, 2, [21,101,192]);
-  pdfText(doc, 'PEWMA DRONE  ·  pewmadrone.com  ·  Plataforma de Inspección RPA  ·  Neuquén, Argentina',
-    W/2, 293, { size:7, color:[139,148,158], align:'center' });
+
 
   pdfFooter(doc, null, 'Resumen');
 }
@@ -4067,8 +4066,8 @@ function construirVistaCliente(p) {
       '<div class="cg-item" id="cg-'+gi+'" onclick="selGrupoCliente('+gi+')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px;">' +
         '<div style="width:10px;height:10px;border-radius:50%;background:'+dotColor+';flex-shrink:0;"></div>' +
         '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:13px;font-weight:600;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(g.nombre)+'</div>' +
-          '<div style="font-size:11px;color:#7a8aaa;margin-top:1px;">'+(g.fotos||[]).length+' fotos · '+hallCount+' hallazgos</div>' +
+          '<div style="font-size:13px;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(g.nombre)+'</div>' +
+          '<div style="font-size:11px;color:#b0bec5;margin-top:1px;">'+(g.fotos||[]).length+' fotos · '+hallCount+' hallazgos</div>' +
         '</div>' +
         (maxSev ? '<span style="background:'+dotColor+';color:#fff;font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;flex-shrink:0;">'+maxSev.toUpperCase()+'</span>' : '') +
       '</div>';
@@ -4131,6 +4130,106 @@ function clienteStat(val, label, color) {
     '<div style="font-size:26px;font-weight:700;color:'+color+';">'+val+'</div>' +
     '<div style="font-size:10px;color:#94a3b8;letter-spacing:1px;margin-top:2px;">'+label+'</div>' +
   '</div>';
+}
+
+// ── PDF de grupo individual desde vista cliente ──
+function generarPDFGrupoCliente(gi) {
+  if (!window.jspdf) {
+    alert('jsPDF no está disponible. Verificá tu conexión a internet.');
+    return;
+  }
+  var g = (proyectoActual.grupos||[])[gi];
+  if (!g) { return; }
+
+  // Precargar imágenes del grupo
+  var fotos = g.fotos || [];
+  var sb = window.sb;
+  var promises = fotos.map(function(f) {
+    var url = null;
+    if (sb) {
+      var viewPath = f.storagePathView || (f.id ? f.id+'/view.jpg' : null);
+      var thumbPath = f.storagePathThumb || (f.id ? f.id+'/thumb.jpg' : null);
+      if (viewPath)  { url = sb.storage.from('pewma-fotos').getPublicUrl(viewPath).data.publicUrl; }
+      else if (thumbPath) { url = sb.storage.from('pewma-fotos').getPublicUrl(thumbPath).data.publicUrl; }
+    }
+    if (!url) { f.pdfImgBase64 = f.viewBase64 || f.thumbBase64 || null; return Promise.resolve(); }
+    return fetch(url).then(function(r){ return r.blob(); }).then(function(blob) {
+      return new Promise(function(res) {
+        var reader = new FileReader();
+        reader.onload = function(e) { f.pdfImgBase64 = e.target.result; res(); };
+        reader.onerror = function() { f.pdfImgBase64 = f.viewBase64 || f.thumbBase64 || null; res(); };
+        reader.readAsDataURL(blob);
+      });
+    }).catch(function(){ f.pdfImgBase64 = f.viewBase64 || f.thumbBase64 || null; });
+  });
+
+  Promise.all(promises).then(function() {
+    var jsPDF = window.jspdf.jsPDF;
+    var doc   = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    var W = 210, margin = 14, cW = W - margin*2;
+    var tax = (window.TAXONOMIAS && TAXONOMIAS[proyectoActual.tipo]) ? TAXONOMIAS[proyectoActual.tipo] : { label: proyectoActual.tipo||'Inspección' };
+
+    // ── Portada simplificada del grupo ──
+    pdfRect(doc, 0, 0, W, 32, [255,255,255]);
+    pdfRect(doc, 0, 32, W, 3, [21,101,192]);
+    try { doc.addImage(PEWMA_LOGO_B64, 'JPEG', margin, 0, 56, 31.5); } catch(e) {}
+    var nro = 'PD-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5);
+    pdfText(doc, 'N° '+nro, W-margin, 14, { size:9, color:[30,30,30], align:'right' });
+    pdfText(doc, 'INFORME DE GRUPO', W-margin, 22, { size:7, color:[100,116,139], align:'right' });
+
+    var y = 42;
+    pdfText(doc, 'INFORME DE INSPECCIÓN', margin, y, { size:8, color:[100,116,139] }); y += 7;
+    pdfText(doc, proyectoActual.nombre, margin, y, { size:18, style:'bold', color:[15,23,42] }); y += 8;
+    pdfText(doc, tax.label.toUpperCase()+' · '+g.nombre, margin, y, { size:10, color:[21,101,192] }); y += 6;
+    if (proyectoActual.cliente) { pdfText(doc, proyectoActual.cliente, margin, y, { size:9, color:[100,116,139] }); y += 5; }
+
+    // Separador
+    doc.setDrawColor(226,232,240); doc.setLineWidth(0.3);
+    doc.line(margin, y, W-margin, y); y += 8;
+
+    // Datos del grupo
+    var col = cW/3;
+    pdfText(doc, 'PILOTO RPA', margin, y, { size:7, color:[100,116,139] });
+    pdfText(doc, (proyectoActual.piloto||'—'), margin, y+5, { size:9, style:'bold', color:[15,23,42] });
+    pdfText(doc, 'EQUIPO', margin+col, y, { size:7, color:[100,116,139] });
+    pdfText(doc, (proyectoActual.equipo||'—'), margin+col, y+5, { size:9, style:'bold', color:[15,23,42] });
+    pdfText(doc, 'GPS REFERENCIA', margin+col*2, y, { size:7, color:[100,116,139] });
+    pdfText(doc, g.lat ? g.lat.toFixed(5)+', '+g.lng.toFixed(5) : '—', margin+col*2, y+5, { size:8, style:'bold', color:[15,23,42] });
+    y += 16;
+
+    doc.setDrawColor(226,232,240);
+    doc.line(margin, y, W-margin, y); y += 8;
+
+    // ── Fotos del grupo ──
+    pdfGrupo(doc, g, proyectoActual.tipo, W, margin, cW);
+
+    // ── Firma / certificación ──
+    doc.addPage();
+    pdfRect(doc, 0, 0, W, 26, [255,255,255]);
+    pdfRect(doc, 0, 26, W, 2, [21,101,192]);
+    try { doc.addImage(PEWMA_LOGO_B64, 'JPEG', margin, 2, 40, 22.5); } catch(e) {}
+    pdfText(doc, 'CERTIFICACIÓN', W/2, 10, { size:7, color:[100,116,139], align:'center' });
+    pdfText(doc, g.nombre + ' — Hallazgos', W/2, 20, { size:13, style:'bold', color:[21,101,192], align:'center' });
+
+    var yr = 36;
+    pdfText(doc, 'Este informe fue generado mediante la Plataforma de Inspección Pewma Drone.', margin, yr, { size:8, color:[100,116,139] }); yr += 6;
+    pdfText(doc, 'Los datos de GPS, imágenes y hallazgos fueron relevados en campo por el piloto RPA certificado ANAC.', margin, yr, { size:8, color:[100,116,139] }); yr += 12;
+    var col3r = cW/3;
+    pdfText(doc, 'PILOTO RPA', margin, yr, { size:7, color:[100,116,139] });
+    pdfText(doc, 'CERTIFICACIÓN ANAC', margin+col3r, yr, { size:7, color:[100,116,139] });
+    pdfText(doc, 'AERONAVE / MATRÍCULA', margin+col3r*2, yr, { size:7, color:[100,116,139] });
+    yr += 6;
+    pdfText(doc, proyectoActual.piloto||'—', margin, yr, { size:11, style:'bold', color:[15,23,42] });
+    pdfText(doc, proyectoActual.certAnac||'—', margin+col3r, yr, { size:11, style:'bold', color:[15,23,42] });
+    var aeroLbl = (proyectoActual.equipo||'') + (proyectoActual.matricula ? ' · '+proyectoActual.matricula : '');
+    pdfText(doc, aeroLbl||'—', margin+col3r*2, yr, { size:11, style:'bold', color:[15,23,42] });
+
+    pdfFooter(doc, null, g.nombre);
+
+    // Guardar
+    var fname = 'Pewma_Drone_'+proyectoActual.nombre.replace(/\s+/g,'_')+'_'+g.nombre.replace(/\s+/g,'_')+'.pdf';
+    doc.save(fname);
+  });
 }
 
 function dibujarBboxCard(img) {
@@ -4261,11 +4360,17 @@ function mostrarPanelGrupoCliente(g) {
   var COND_LABEL = { ok:'OK', moderado:'Moderado', alto:'Alto', critico:'Crítico', 'n/a':'N/A' };
   var COND_COLOR = { ok:'#22c55e', moderado:'#eab308', alto:'#f97316', critico:'#ef4444', 'n/a':'#7a8aaa' };
 
+  var gIdx2 = (proyectoActual.grupos||[]).indexOf(g);
   var html = '<div style="padding:0;background:#131c2e;min-height:100%;">' +
-    '<div style="background:#1a2540;padding:14px 16px;border-bottom:1px solid #253050;">' +
-      '<div style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;">' + esc(tax.label||'Grupo') + '</div>' +
-      '<div style="font-size:17px;font-weight:700;color:#e6edf3;">' + esc(g.nombre) + '</div>' +
-      (g.lat ? '<div style="font-size:11px;color:#7a8aaa;margin-top:3px;">'+g.lat.toFixed(5)+', '+g.lng.toFixed(5)+(g.alt?' · '+g.alt.toFixed(1)+'m':'')+'</div>' : '') +
+    '<div style="background:#1a2540;padding:12px 16px;border-bottom:1px solid #253050;">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">' +
+        '<div style="min-width:0;">' +
+          '<div style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;">' + esc(tax.label||'Grupo') + '</div>' +
+          '<div style="font-size:17px;font-weight:700;color:#e6edf3;">' + esc(g.nombre) + '</div>' +
+          (g.lat ? '<div style="font-size:11px;color:#7a8aaa;margin-top:3px;">'+g.lat.toFixed(5)+', '+g.lng.toFixed(5)+(g.alt?' · '+g.alt.toFixed(1)+'m':'')+'</div>' : '') +
+        '</div>' +
+        '<button onclick="generarPDFGrupoCliente('+gIdx2+')" style="background:#1565c0;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:Barlow,sans-serif;font-weight:600;margin-top:2px;">📄 PDF</button>' +
+      '</div>' +
     '</div>' +
     // Fotos con hallazgos
     '<div style="padding:10px;display:flex;flex-direction:column;gap:10px;width:100%;box-sizing:border-box;">';
