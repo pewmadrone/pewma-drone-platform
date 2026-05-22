@@ -133,6 +133,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   display:flex;align-items:center;justify-content:center;transition:all .15s}
 .project-card:hover .card-del{color:var(--muted);border-color:var(--border);background:var(--surf2)}
 .card-del:hover{color:var(--crit)!important;border-color:var(--crit)!important;background:rgba(239,68,68,.1)!important}
+.card-share{position:absolute;top:42px;right:10px;width:22px;height:22px;
+  background:transparent;border:1px solid transparent;border-radius:4px;
+  color:transparent;font-size:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .15s}
+.project-card:hover .card-share{color:var(--muted);border-color:var(--border);background:var(--surf2)}
+.card-share:hover{color:var(--accent)!important;border-color:var(--accent)!important;background:rgba(21,101,192,.1)!important}
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
   min-height:380px;text-align:center;gap:12px;grid-column:1/-1}
 .empty-icon{width:72px;height:72px;background:var(--surface);border:1px solid var(--border);
@@ -1435,6 +1441,7 @@ function buildCard(p) {
   return '<div class="project-card" onclick="irAProyecto(\''+p.id+'\')">'+
     '<div class="card-bar '+barT+'"></div>'+
     '<button class="card-del" onclick="event.stopPropagation();eliminarProyecto(\''+p.id+'\')">🗑</button>'+
+    '<button class="card-share" title="Compartir con cliente" onclick="event.stopPropagation();copiarLinkCliente(\''+p.id+'\')">🔗</button>'+
     '<div class="card-body">'+
       '<div class="card-head">'+
         '<div class="type-badge">'+icon+'</div>'+
@@ -3803,16 +3810,247 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ══════════════════════════════════════════════
+// MODO CLIENTE — Vista de solo lectura
+// ══════════════════════════════════════════════
+function iniciarModoCliente(pid) {
+  var all = getProyectos();
+  var p = all.find(function(x){ return x.id === pid; });
+  if (!p) {
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0c1220;color:#e6edf3;font-family:Barlow,sans-serif;flex-direction:column;gap:16px"><div style="font-size:48px">⚠️</div><div style="font-size:18px">Proyecto no encontrado</div><div style="color:#7a8aaa;font-size:13px">El link puede haber expirado o el proyecto no existe.</div></div>';
+    return;
+  }
+
+  proyectoActual = JSON.parse(JSON.stringify(p));
+  if (!proyectoActual.grupos) { proyectoActual.grupos = []; }
+
+  // Ocultar toda la UI de edición, mostrar vista cliente
+  document.body.innerHTML = construirVistaCliente(proyectoActual);
+
+  // Inicializar mapa Leaflet en la vista cliente
+  setTimeout(function() { inicializarMapaCliente(); }, 200);
+}
+
+function construirVistaCliente(p) {
+  var tax = (window.TAXONOMIAS && TAXONOMIAS[p.tipo]) ? TAXONOMIAS[p.tipo] : { label: p.tipo || 'Inspección' };
+  var totalHalls = 0, criticos = 0, altos = 0;
+  (p.grupos||[]).forEach(function(g) {
+    (g.fotos||[]).forEach(function(f) {
+      (f.hallazgos||[]).forEach(function(h) {
+        totalHalls++;
+        if (h.condicion === 'critico') { criticos++; }
+        if (h.condicion === 'alto') { altos++; }
+      });
+    });
+  });
+
+  return '<div style="min-height:100vh;background:#f8fafc;font-family:Barlow,sans-serif;">' +
+    // Header blanco con logo
+    '<div style="background:#fff;border-bottom:3px solid #1565c0;padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:64px;">' +
+      '<img src="'+PEWMA_LOGO_B64+'" style="height:40px;object-fit:contain;" alt="Pewma Drone">' +
+      '<div style="font-size:12px;color:#7a8aaa;text-align:right;">INFORME INTERACTIVO · SOLO LECTURA</div>' +
+    '</div>' +
+    // Banda del proyecto
+    '<div style="background:#1565c0;padding:20px 32px;">' +
+      '<div style="font-size:11px;color:rgba(255,255,255,0.7);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">' + esc(tax.label) + '</div>' +
+      '<div style="font-size:24px;font-weight:700;color:#fff;margin-bottom:4px;">' + esc(p.nombre) + '</div>' +
+      '<div style="font-size:13px;color:rgba(255,255,255,0.75);">Cliente: ' + esc(p.cliente||'—') + ' · Fecha: ' + (p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}) : '—') + '</div>' +
+    '</div>' +
+    // Stats strip
+    '<div style="background:#fff;border-bottom:1px solid #e2e8f0;display:flex;gap:0;">' +
+      clienteStat((p.grupos||[]).length, 'GRUPOS', '#1565c0') +
+      clienteStat(p.totalImagenes||0, 'IMÁGENES', '#1565c0') +
+      clienteStat(totalHalls, 'HALLAZGOS', '#1565c0') +
+      clienteStat(criticos, 'CRÍTICOS', '#ef4444') +
+      clienteStat(altos, 'ALTOS', '#f97316') +
+    '</div>' +
+    // Mapa + panel lateral
+    '<div style="display:flex;height:calc(100vh - 200px);">' +
+      '<div id="mapaCliente" style="flex:1;min-width:0;"></div>' +
+      '<div id="panelCliente" style="width:380px;background:#fff;border-left:1px solid #e2e8f0;overflow-y:auto;display:flex;align-items:center;justify-content:center;">' +
+        '<div style="text-align:center;color:#94a3b8;padding:32px;">' +
+          '<div style="font-size:40px;margin-bottom:12px;">📍</div>' +
+          '<div style="font-size:14px;">Hacé click en un grupo del mapa para ver los detalles</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    // Footer
+    '<div style="background:#fff;border-top:1px solid #e2e8f0;padding:12px 32px;display:flex;justify-content:space-between;align-items:center;">' +
+      '<div style="font-size:12px;color:#94a3b8;">Pewma Drone · Plataforma de Inspección RPA · pewmadrone.com</div>' +
+      '<div style="font-size:12px;color:#94a3b8;">Vista de solo lectura · Los datos son confidenciales</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function clienteStat(val, label, color) {
+  return '<div style="flex:1;padding:14px 20px;border-right:1px solid #e2e8f0;text-align:center;">' +
+    '<div style="font-size:26px;font-weight:700;color:'+color+';">'+val+'</div>' +
+    '<div style="font-size:10px;color:#94a3b8;letter-spacing:1px;margin-top:2px;">'+label+'</div>' +
+  '</div>';
+}
+
+function inicializarMapaCliente() {
+  var grupos = (proyectoActual.grupos||[]).filter(function(g){ return g.lat; });
+  if (!grupos.length) {
+    document.getElementById('mapaCliente').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:14px;">Sin datos GPS disponibles</div>';
+    return;
+  }
+
+  var centro = [grupos[0].lat, grupos[0].lng];
+  var mapa = L.map('mapaCliente', { zoomControl: true }).setView(centro, 16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 20
+  }).addTo(mapa);
+
+  // Colores por severidad
+  var COLORES = { critico:'#ef4444', alto:'#f97316', moderado:'#eab308', ok:'#22c55e', default:'#1565c0' };
+
+  grupos.forEach(function(g) {
+    var maxSev = 'default';
+    (g.fotos||[]).forEach(function(f) {
+      (f.hallazgos||[]).forEach(function(h) {
+        if (h.condicion === 'critico') { maxSev = 'critico'; }
+        else if (h.condicion === 'alto' && maxSev !== 'critico') { maxSev = 'alto'; }
+        else if (h.condicion === 'moderado' && maxSev !== 'critico' && maxSev !== 'alto') { maxSev = 'moderado'; }
+      });
+    });
+
+    var color = COLORES[maxSev] || COLORES.default;
+    var icon = L.divIcon({
+      html: '<div style="background:'+color+';width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>',
+      iconSize: [22, 22], iconAnchor: [11, 11], className: ''
+    });
+
+    var marker = L.marker([g.lat, g.lng], { icon: icon }).addTo(mapa);
+    marker.on('click', function() { mostrarPanelGrupoCliente(g); });
+  });
+
+  // Ajustar bounds
+  if (grupos.length > 1) {
+    var bounds = L.latLngBounds(grupos.map(function(g){ return [g.lat, g.lng]; }));
+    mapa.fitBounds(bounds, { padding: [40, 40] });
+  }
+}
+
+function mostrarPanelGrupoCliente(g) {
+  var panel = document.getElementById('panelCliente');
+  var sb = window.supabaseClient;
+  var tax = (window.TAXONOMIAS && TAXONOMIAS[proyectoActual.tipo]) ? TAXONOMIAS[proyectoActual.tipo] : {};
+
+  var halls = [];
+  (g.fotos||[]).forEach(function(f) {
+    (f.hallazgos||[]).forEach(function(h) { halls.push({ h: h, f: f }); });
+  });
+
+  var COND_LABEL = { ok:'OK', moderado:'Moderado', alto:'Alto', critico:'Crítico', 'n/a':'N/A' };
+  var COND_COLOR = { ok:'#22c55e', moderado:'#eab308', alto:'#f97316', critico:'#ef4444', 'n/a':'#7a8aaa' };
+
+  var html = '<div style="padding:0;">' +
+    // Header del grupo
+    '<div style="background:#1565c0;padding:16px 20px;">' +
+      '<div style="font-size:10px;color:rgba(255,255,255,0.7);letter-spacing:1px;text-transform:uppercase;">' + esc(tax.label||'Grupo') + '</div>' +
+      '<div style="font-size:18px;font-weight:700;color:#fff;margin:4px 0;">' + esc(g.nombre) + '</div>' +
+      (g.lat ? '<div style="font-size:11px;color:rgba(255,255,255,0.7);">'+g.lat.toFixed(5)+', '+g.lng.toFixed(5)+(g.alt?' · '+g.alt.toFixed(1)+'m':'')+'</div>' : '') +
+    '</div>' +
+    // Fotos con hallazgos
+    '<div style="padding:16px;">';
+
+  (g.fotos||[]).forEach(function(f) {
+    var imgSrc = null;
+    if (f.storagePathThumb && sb) {
+      imgSrc = sb.storage.from('pewma-fotos').getPublicUrl(f.storagePathThumb).data.publicUrl;
+    } else if (f.thumbBase64) {
+      imgSrc = f.thumbBase64;
+    }
+
+    var fHalls = (f.hallazgos||[]);
+    html += '<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:12px;">';
+
+    // Foto thumbnail
+    if (imgSrc) {
+      html += '<img src="'+imgSrc+'" style="width:100%;height:160px;object-fit:cover;display:block;cursor:pointer;" data-src="'+imgSrc+'" onclick="abrirFotoClienteEvt(this)">';
+    }
+
+    html += '<div style="padding:12px;">';
+    html += '<div style="font-size:11px;color:#64748b;margin-bottom:4px;font-family:JetBrains Mono,monospace;">' + esc(f.nombre||f.id) + '</div>';
+
+    if (f.tipo === 'termica') {
+      html += '<span style="background:#f97316;color:#fff;font-size:10px;padding:2px 8px;border-radius:3px;font-weight:600;letter-spacing:0.5px;">TÉRMICA</span>';
+    } else {
+      html += '<span style="background:#1565c0;color:#fff;font-size:10px;padding:2px 8px;border-radius:3px;font-weight:600;letter-spacing:0.5px;">RGB</span>';
+    }
+
+    if (fHalls.length === 0) {
+      html += '<div style="color:#94a3b8;font-size:12px;margin-top:8px;">Sin hallazgos registrados</div>';
+    } else {
+      fHalls.forEach(function(h) {
+        var cc = COND_COLOR[h.condicion] || '#7a8aaa';
+        var cl = COND_LABEL[h.condicion] || h.condicion;
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px;background:#f8fafc;border-radius:6px;border-left:3px solid '+cc+';">' +
+          '<span style="background:'+cc+';color:#fff;font-size:10px;padding:2px 7px;border-radius:3px;font-weight:700;white-space:nowrap;">'+cl.toUpperCase()+'</span>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:13px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(h.descripcion||'—')+'</div>' +
+            (h.comentario ? '<div style="font-size:11px;color:#64748b;margin-top:2px;">'+esc(h.comentario)+'</div>' : '') +
+          '</div>' +
+        '</div>';
+      });
+    }
+
+    html += '</div></div>';
+  });
+
+  if ((g.fotos||[]).length === 0) {
+    html += '<div style="text-align:center;color:#94a3b8;padding:24px 0;font-size:13px;">Sin imágenes en este grupo</div>';
+  }
+
+  html += '</div></div>';
+  panel.innerHTML = html;
+}
+
+function abrirFotoClienteEvt(el) {
+  abrirFotoCliente(el.getAttribute('data-src'));
+}
+function abrirFotoCliente(src) {
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+  overlay.innerHTML = '<img src="'+src+'" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:4px;">';
+  overlay.onclick = function() { document.body.removeChild(overlay); };
+  document.body.appendChild(overlay);
+}
+
+// ── Generar link para compartir con el cliente ──
+function generarLinkCliente(pid) {
+  var base = window.location.origin + window.location.pathname;
+  return base + '?proyecto=' + pid + '&modo=cliente';
+}
+
+function copiarLinkCliente(pid) {
+  var link = generarLinkCliente(pid);
+  navigator.clipboard.writeText(link).then(function() {
+    mostrarToast('Link copiado al portapapeles 📋', '📋');
+  }).catch(function() {
+    prompt('Copiá este link para el cliente:', link);
+  });
+}
+
+// ══════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════
+// ── MODO CLIENTE: detectar ?proyecto=ID&modo=cliente en la URL ──
+var MODO_CLIENTE = false;
+var CLIENTE_PROYECTO_ID = null;
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('modo') === 'cliente' && params.get('proyecto')) {
+    MODO_CLIENTE = true;
+    CLIENTE_PROYECTO_ID = params.get('proyecto');
+  }
+})();
+
 // Inicializar IndexedDB + Supabase y luego arrancar
 initDB().then(function() {
   initSupabase();
-  // Cargar proyectos desde Supabase si hay conexión, sino desde cache local
   cargarProyectosSupabase().then(function(remoteData) {
     if (remoteData) {
-      // Merge: Supabase es la fuente de verdad
-      // Restaurar imágenes de IndexedDB para la sesión actual
       var promises = [];
       remoteData.forEach(function(p) {
         (p.grupos||[]).forEach(function(g) {
@@ -3827,13 +4065,20 @@ initDB().then(function() {
         });
       });
       Promise.all(promises).then(function() {
-        actualizarStats();
-        renderProyectos();
+        if (MODO_CLIENTE && CLIENTE_PROYECTO_ID) {
+          iniciarModoCliente(CLIENTE_PROYECTO_ID);
+        } else {
+          actualizarStats();
+          renderProyectos();
+        }
       });
     } else {
-      // Sin conexión: usar cache local
-      actualizarStats();
-      renderProyectos();
+      if (MODO_CLIENTE && CLIENTE_PROYECTO_ID) {
+        iniciarModoCliente(CLIENTE_PROYECTO_ID);
+      } else {
+        actualizarStats();
+        renderProyectos();
+      }
     }
   });
 });
