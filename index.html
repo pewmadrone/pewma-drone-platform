@@ -3893,6 +3893,9 @@ function construirVistaCliente(p) {
       'body{margin:0;overflow:hidden}' +
       '.cg-item:hover{background:rgba(255,255,255,0.06)!important}' +
       '.cg-item.activo{background:rgba(21,101,192,0.25)!important;border-left:3px solid #1565c0}' +
+      '.pewma-popup .leaflet-popup-content-wrapper{background:#1a2540;border:1px solid #253050;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.5);color:#e6edf3;}' +
+      '.pewma-popup .leaflet-popup-tip{background:#1a2540;}' +
+      '.pewma-popup .leaflet-popup-close-button{color:#7a8aaa!important;font-size:18px!important;top:6px!important;right:8px!important;}' +
       '@media(max-width:768px){' +
         '#cSidebar{display:none!important}' +
         '#cPanel{width:100%!important;position:fixed!important;bottom:0;left:0;right:0;height:52vh;z-index:500;border-radius:12px 12px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,0.4);}' +
@@ -3940,6 +3943,51 @@ function clienteStat(val, label, color) {
   '</div>';
 }
 
+function dibujarBboxCard(img) {
+  var halls = [];
+  try { halls = JSON.parse(decodeURIComponent(img.getAttribute('data-halls')||'[]')); } catch(e){ return; }
+  if (!halls.some(function(h){ return h.bbox; })) { return; }
+  var canvas = document.getElementById('bbox-'+img.id.replace('card-img-',''));
+  if (!canvas) { return; }
+  var W = img.offsetWidth || img.naturalWidth;
+  var H = img.offsetHeight || img.naturalHeight;
+  canvas.width  = W;
+  canvas.height = H;
+  canvas.style.width  = W+'px';
+  canvas.style.height = H+'px';
+  var ctx = canvas.getContext('2d');
+  var COND_COLOR = { ok:'#22c55e', moderado:'#eab308', alto:'#f97316', critico:'#ef4444', 'n/a':'#7a8aaa' };
+  halls.forEach(function(h) {
+    if (!h.bbox) { return; }
+    var color = COND_COLOR[h.condicion] || '#1565c0';
+    var x  = h.bbox.x * W;
+    var y  = h.bbox.y * H;
+    var w  = h.bbox.w * W;
+    var ht = h.bbox.h * H;
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 2.5;
+    ctx.strokeRect(x, y, w, ht);
+    // Label
+    ctx.font = 'bold 11px Barlow,sans-serif';
+    var label = (h.codigo||'A');
+    var tw = ctx.measureText(label).width + 8;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y - 18, tw, 18);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label, x + 4, y - 5);
+  });
+}
+
+function selGrupoClientePopup(gi) {
+  // Cerrar todos los popups del mapa
+  document.querySelectorAll('.leaflet-popup-close-button').forEach(function(b){ b.click(); });
+  selGrupoCliente(gi);
+  var cp = document.getElementById('cPanel');
+  if (cp && window.innerWidth <= 768) {
+    setTimeout(function(){ cp.scrollIntoView({ behavior:'smooth', block:'start' }); }, 150);
+  }
+}
+
 function selGrupoCliente(gi) {
   var g = (proyectoActual.grupos||[])[gi];
   if (!g) { console.warn('selGrupoCliente: grupo '+gi+' no encontrado'); return; }
@@ -3983,20 +4031,21 @@ function inicializarMapaCliente() {
     });
 
     var marker = L.marker([g.lat, g.lng], { icon: icon }).addTo(mapa);
-    marker.on('click', function() {
-      // Marcar grupo activo en sidebar
-      var gidx = (proyectoActual.grupos||[]).indexOf(g);
-      document.querySelectorAll('.cg-item').forEach(function(el){ el.classList.remove('activo'); });
-      var sbi = document.getElementById('cg-'+gidx);
-      if (sbi) { sbi.classList.add('activo'); sbi.scrollIntoView({block:'nearest'}); }
-      mostrarPanelGrupoCliente(g);
-      // En mobile: scroll suave al panel
-      var panel = document.getElementById('cPanel');
-      var cp = document.getElementById('cPanel');
-      if (cp && window.innerWidth <= 768) {
-        setTimeout(function(){ cp.scrollIntoView({ behavior:'smooth', block:'start' }); }, 150);
-      }
-    });
+
+    // Popup con info rápida
+    var gIdx = (proyectoActual.grupos||[]).indexOf(g);
+    var gHalls = 0;
+    (g.fotos||[]).forEach(function(f){ gHalls += (f.hallazgos||[]).length; });
+    var popupHtml =
+      '<div style="font-family:Barlow,sans-serif;min-width:160px;">' +
+        '<div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#e6edf3;">' + esc(g.nombre) + '</div>' +
+        '<div style="font-size:12px;color:#7a8aaa;margin-bottom:8px;">📷 ' + (g.fotos||[]).length + ' fotos &nbsp; 🔍 ' + gHalls + ' hallazgos</div>' +
+        '<div style="font-size:11px;color:#7a8aaa;margin-bottom:8px;">📍 ' + g.lat.toFixed(5) + ', ' + g.lng.toFixed(5) + '</div>' +
+        '<button onclick="selGrupoClientePopup(' + gIdx + ')" ' +
+          'style="background:#1565c0;color:#fff;border:none;padding:6px 0;border-radius:4px;font-size:12px;cursor:pointer;width:100%;font-family:Barlow,sans-serif;">Ver detalles →</button>' +
+      '</div>';
+    marker.bindPopup(popupHtml, { maxWidth: 220, className: 'pewma-popup' });
+    marker.on('click', function() { marker.openPopup(); });
   });
 
   // Ajustar bounds
@@ -4029,7 +4078,7 @@ function mostrarPanelGrupoCliente(g) {
       (g.lat ? '<div style="font-size:11px;color:#7a8aaa;margin-top:3px;">'+g.lat.toFixed(5)+', '+g.lng.toFixed(5)+(g.alt?' · '+g.alt.toFixed(1)+'m':'')+'</div>' : '') +
     '</div>' +
     // Fotos con hallazgos
-    '<div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;width:100%;box-sizing:border-box;">';
+    '<div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;width:100%;box-sizing:border-box;align-content:start;">';
 
   (g.fotos||[]).forEach(function(f) {
     // Resolver URL de imagen desde Supabase Storage
@@ -4054,12 +4103,14 @@ function mostrarPanelGrupoCliente(g) {
     if (imgSrc) {
       var hallsJson = encodeURIComponent(JSON.stringify(fHalls));
       var hasBbox = fHalls.some(function(h){return h.bbox;});
-      html += '<div style="position:relative;background:#0c1220;">' +
-        '<img src="'+imgSrc+'" style="width:100%;height:200px;object-fit:cover;display:block;cursor:zoom-in;" ' +
-          'data-full="'+(imgFullSrc||imgSrc)+'" data-halls="'+hallsJson+'" onclick="abrirFotoClienteEvt(this)" ' +
-          'onerror="this.style.display=\'none\'">' +
+      var cardId = 'card-img-'+f.id;
+      html += '<div style="position:relative;background:#0c1220;height:200px;overflow:hidden;cursor:zoom-in;" onclick="abrirFotoClienteEvt(document.getElementById(\''+cardId+'\'))">' +
+        '<img id="'+cardId+'" src="'+imgSrc+'" style="width:100%;height:200px;object-fit:cover;display:block;" ' +
+          'data-full="'+(imgFullSrc||imgSrc)+'" data-halls="'+hallsJson+'" ' +
+          'onerror="this.style.display=\'none\'" ' +
+          'onload="dibujarBboxCard(this)">' +
+        '<canvas id="bbox-'+f.id+'" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>' +
         '<div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.65);color:#fff;font-size:10px;padding:2px 8px;border-radius:3px;">🔍 Ver foto</div>' +
-        (hasBbox ? '<div style="position:absolute;top:6px;left:6px;background:rgba(249,115,22,0.85);color:#fff;font-size:10px;padding:2px 7px;border-radius:3px;">📌 Marcado</div>' : '') +
       '</div>';
     } else {
       html += '<div style="height:60px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:22px;">📷</div>';
