@@ -3920,8 +3920,8 @@ function construirVistaCliente(p) {
           '<div style="padding:8px 14px 4px;font-size:10px;color:#7a8aaa;letter-spacing:1.5px;text-transform:uppercase;">'+((p.grupos||[]).length)+' GRUPOS</div>' +
           sidebarGrupos +
         '</div>' +
-        '<div id="cMapa" style="flex:1;min-width:220px;max-width:45%;"></div>' +
-        '<div id="cPanel" style="flex:1.4;min-width:300px;background:#131c2e;border-left:1px solid #253050;overflow-y:auto;display:flex;align-items:flex-start;justify-content:flex-start;flex-direction:column;">' +
+        '<div id="cMapa" style="flex:1.8;min-width:280px;"></div>' +
+        '<div id="cPanel" style="flex:1;min-width:260px;max-width:420px;background:#131c2e;border-left:1px solid #253050;overflow-y:auto;display:flex;align-items:flex-start;justify-content:flex-start;flex-direction:column;">' +
           '<div style="text-align:center;color:#7a8aaa;padding:32px;">' +
             '<div style="font-size:36px;margin-bottom:12px;">📍</div>' +
             '<div style="font-size:13px;">Seleccioná un grupo del sidebar o tocá un punto del mapa</div>' +
@@ -4078,7 +4078,7 @@ function mostrarPanelGrupoCliente(g) {
       (g.lat ? '<div style="font-size:11px;color:#7a8aaa;margin-top:3px;">'+g.lat.toFixed(5)+', '+g.lng.toFixed(5)+(g.alt?' · '+g.alt.toFixed(1)+'m':'')+'</div>' : '') +
     '</div>' +
     // Fotos con hallazgos
-    '<div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;width:100%;box-sizing:border-box;align-content:start;">';
+    '<div style="padding:10px;display:flex;flex-direction:column;gap:10px;width:100%;box-sizing:border-box;">';
 
   (g.fotos||[]).forEach(function(f) {
     // Resolver URL de imagen desde Supabase Storage
