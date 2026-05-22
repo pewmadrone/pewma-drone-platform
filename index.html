@@ -3864,50 +3864,73 @@ function construirVistaCliente(p) {
     });
   });
 
-  return '<div style="min-height:100vh;background:#f8fafc;font-family:Barlow,sans-serif;">' +
-    // Header blanco con logo
-    '<div style="background:#fff;border-bottom:3px solid #1565c0;padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:64px;">' +
-      '<img src="'+PEWMA_LOGO_B64+'" style="height:40px;object-fit:contain;" alt="Pewma Drone">' +
-      '<div style="font-size:12px;color:#7a8aaa;text-align:right;">INFORME INTERACTIVO · SOLO LECTURA</div>' +
-    '</div>' +
-    // Banda del proyecto
-    '<div style="background:#1565c0;padding:20px 32px;">' +
-      '<div style="font-size:11px;color:rgba(255,255,255,0.7);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">' + esc(tax.label) + '</div>' +
-      '<div style="font-size:24px;font-weight:700;color:#fff;margin-bottom:4px;">' + esc(p.nombre) + '</div>' +
-      '<div style="font-size:13px;color:rgba(255,255,255,0.75);">Cliente: ' + esc(p.cliente||'—') + ' · Fecha: ' + (p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}) : '—') + '</div>' +
-    '</div>' +
-    // Stats strip
-    '<div style="background:#fff;border-bottom:1px solid #e2e8f0;display:flex;gap:0;">' +
-      clienteStat((p.grupos||[]).length, 'GRUPOS', '#1565c0') +
-      clienteStat(p.totalImagenes||0, 'IMÁGENES', '#1565c0') +
-      clienteStat(totalHalls, 'HALLAZGOS', '#1565c0') +
-      clienteStat(criticos, 'CRÍTICOS', '#ef4444') +
-      clienteStat(altos, 'ALTOS', '#f97316') +
-    '</div>' +
-    // Layout responsive: en mobile apilado, en desktop lado a lado
+  var COND_COLOR = { ok:'#22c55e', moderado:'#eab308', alto:'#f97316', critico:'#ef4444' };
+  var sidebarGrupos = '';
+  (p.grupos||[]).forEach(function(g, gi) {
+    var maxSev = null, hallCount = 0;
+    (g.fotos||[]).forEach(function(f) {
+      (f.hallazgos||[]).forEach(function(h) {
+        hallCount++;
+        if (h.condicion==='critico') { maxSev='critico'; }
+        else if (h.condicion==='alto' && maxSev!=='critico') { maxSev='alto'; }
+        else if (h.condicion==='moderado' && !maxSev) { maxSev='moderado'; }
+      });
+    });
+    var dotColor = maxSev ? COND_COLOR[maxSev] : '#22c55e';
+    sidebarGrupos +=
+      '<div class="cg-item" id="cg-'+gi+'" onclick="selGrupoCliente('+gi+')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px;">' +
+        '<div style="width:10px;height:10px;border-radius:50%;background:'+dotColor+';flex-shrink:0;"></div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:13px;font-weight:600;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(g.nombre)+'</div>' +
+          '<div style="font-size:11px;color:#7a8aaa;margin-top:1px;">'+(g.fotos||[]).length+' fotos · '+hallCount+' hallazgos</div>' +
+        '</div>' +
+        (maxSev ? '<span style="background:'+dotColor+';color:#fff;font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;flex-shrink:0;">'+maxSev.toUpperCase()+'</span>' : '') +
+      '</div>';
+  });
+
+  return (
     '<style>' +
-      '@media(max-width:700px){' +
-        '#clienteWrap{flex-direction:column!important;height:auto!important}' +
-        '#mapaCliente{height:55vw!important;min-height:260px;max-height:380px}' +
-        '#panelCliente{width:100%!important;border-left:none!important;border-top:1px solid #e2e8f0;max-height:60vh;overflow-y:auto}' +
-        '.cliente-stats div{padding:10px 8px!important}' +
+      'body{margin:0;overflow:hidden}' +
+      '.cg-item:hover{background:rgba(255,255,255,0.06)!important}' +
+      '.cg-item.activo{background:rgba(21,101,192,0.25)!important;border-left:3px solid #1565c0}' +
+      '@media(max-width:768px){' +
+        '#cSidebar{display:none!important}' +
+        '#cPanel{width:100%!important;position:fixed!important;bottom:0;left:0;right:0;height:52vh;z-index:500;border-radius:12px 12px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,0.4);}' +
       '}' +
     '</style>' +
-    '<div id="clienteWrap" style="display:flex;height:calc(100vh - 205px);">' +
-      '<div id="mapaCliente" style="flex:1;min-width:0;"></div>' +
-      '<div id="panelCliente" style="width:380px;background:#fff;border-left:1px solid #e2e8f0;overflow-y:auto;display:flex;align-items:center;justify-content:center;">' +
-        '<div style="text-align:center;color:#94a3b8;padding:32px;">' +
-          '<div style="font-size:40px;margin-bottom:12px;">📍</div>' +
-          '<div style="font-size:14px;">Tocá un punto del mapa para ver los detalles</div>' +
+    '<div style="display:flex;flex-direction:column;height:100vh;font-family:Barlow,sans-serif;background:#0c1220;">' +
+      '<div style="background:#131c2e;border-bottom:1px solid #253050;padding:0 16px;display:flex;align-items:center;gap:14px;height:52px;flex-shrink:0;">' +
+        '<img src="'+PEWMA_LOGO_B64+'" style="height:30px;object-fit:contain;" alt="Pewma Drone">' +
+        '<div style="width:1px;height:26px;background:#253050;"></div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;">'+esc(tax.label)+'</div>' +
+          '<div style="font-size:14px;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(p.nombre)+'</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:14px;flex-shrink:0;">' +
+          '<div style="text-align:center;"><div style="font-size:15px;font-weight:700;color:#e6edf3;">'+totalHalls+'</div><div style="font-size:9px;color:#7a8aaa;">HALLAZGOS</div></div>' +
+          '<div style="text-align:center;"><div style="font-size:15px;font-weight:700;color:#ef4444;">'+criticos+'</div><div style="font-size:9px;color:#7a8aaa;">CRÍTICOS</div></div>' +
+          '<div style="text-align:center;"><div style="font-size:15px;font-weight:700;color:#f97316;">'+altos+'</div><div style="font-size:9px;color:#7a8aaa;">ALTOS</div></div>' +
         '</div>' +
       '</div>' +
-    '</div>' +
-    // Footer
-    '<div style="background:#fff;border-top:1px solid #e2e8f0;padding:12px 32px;display:flex;justify-content:space-between;align-items:center;">' +
-      '<div style="font-size:12px;color:#94a3b8;">Pewma Drone · Plataforma de Inspección RPA · pewmadrone.com</div>' +
-      '<div style="font-size:12px;color:#94a3b8;">Vista de solo lectura · Los datos son confidenciales</div>' +
-    '</div>' +
-  '</div>';
+      '<div style="display:flex;flex:1;min-height:0;">' +
+        '<div id="cSidebar" style="width:210px;background:#131c2e;border-right:1px solid #253050;overflow-y:auto;flex-shrink:0;">' +
+          '<div style="padding:8px 14px 4px;font-size:10px;color:#7a8aaa;letter-spacing:1.5px;text-transform:uppercase;">'+((p.grupos||[]).length)+' GRUPOS</div>' +
+          sidebarGrupos +
+        '</div>' +
+        '<div id="cMapa" style="flex:1;min-width:0;"></div>' +
+        '<div id="cPanel" style="width:340px;background:#131c2e;border-left:1px solid #253050;overflow-y:auto;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+          '<div style="text-align:center;color:#7a8aaa;padding:32px;">' +
+            '<div style="font-size:36px;margin-bottom:12px;">📍</div>' +
+            '<div style="font-size:13px;">Seleccioná un grupo del sidebar o tocá un punto del mapa</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="background:#0c1220;border-top:1px solid #253050;padding:6px 16px;display:flex;justify-content:space-between;flex-shrink:0;">' +
+        '<div style="font-size:11px;color:#7a8aaa;">Pewma Drone · pewmadrone.com</div>' +
+        '<div style="font-size:11px;color:#7a8aaa;">Solo lectura · Confidencial</div>' +
+      '</div>' +
+    '</div>'
+  );
 }
 
 function clienteStat(val, label, color) {
@@ -3917,15 +3940,25 @@ function clienteStat(val, label, color) {
   '</div>';
 }
 
+function selGrupoCliente(gi) {
+  var g = (proyectoActual.grupos||[])[gi];
+  if (!g) { return; }
+  // Marcar activo en sidebar
+  document.querySelectorAll('.cg-item').forEach(function(el){ el.classList.remove('activo'); });
+  var el = document.getElementById('cg-'+gi);
+  if (el) { el.classList.add('activo'); }
+  mostrarPanelGrupoCliente(g);
+}
+
 function inicializarMapaCliente() {
   var grupos = (proyectoActual.grupos||[]).filter(function(g){ return g.lat; });
   if (!grupos.length) {
-    document.getElementById('mapaCliente').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:14px;">Sin datos GPS disponibles</div>';
+    document.getElementById('cMapa').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:14px;">Sin datos GPS disponibles</div>';
     return;
   }
 
   var centro = [grupos[0].lat, grupos[0].lng];
-  var mapa = L.map('mapaCliente', { zoomControl: true }).setView(centro, 16);
+  var mapa = L.map('cMapa', { zoomControl: true }).setView(centro, 16);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     attribution: '© OpenStreetMap © CARTO',
     subdomains: 'abcd', maxZoom: 20
@@ -3952,11 +3985,17 @@ function inicializarMapaCliente() {
 
     var marker = L.marker([g.lat, g.lng], { icon: icon }).addTo(mapa);
     marker.on('click', function() {
+      // Marcar grupo activo en sidebar
+      var gidx = (proyectoActual.grupos||[]).indexOf(g);
+      document.querySelectorAll('.cg-item').forEach(function(el){ el.classList.remove('activo'); });
+      var sbi = document.getElementById('cg-'+gidx);
+      if (sbi) { sbi.classList.add('activo'); sbi.scrollIntoView({block:'nearest'}); }
       mostrarPanelGrupoCliente(g);
       // En mobile: scroll suave al panel
-      var panel = document.getElementById('panelCliente');
-      if (panel && window.innerWidth <= 700) {
-        setTimeout(function(){ panel.scrollIntoView({ behavior:'smooth', block:'start' }); }, 100);
+      var panel = document.getElementById('cPanel');
+      var cp = document.getElementById('cPanel');
+      if (cp && window.innerWidth <= 768) {
+        setTimeout(function(){ cp.scrollIntoView({ behavior:'smooth', block:'start' }); }, 150);
       }
     });
   });
@@ -3981,15 +4020,14 @@ function mostrarPanelGrupoCliente(g) {
   var COND_LABEL = { ok:'OK', moderado:'Moderado', alto:'Alto', critico:'Crítico', 'n/a':'N/A' };
   var COND_COLOR = { ok:'#22c55e', moderado:'#eab308', alto:'#f97316', critico:'#ef4444', 'n/a':'#7a8aaa' };
 
-  var html = '<div style="padding:0;">' +
-    // Header del grupo
-    '<div style="background:#1565c0;padding:16px 20px;">' +
-      '<div style="font-size:10px;color:rgba(255,255,255,0.7);letter-spacing:1px;text-transform:uppercase;">' + esc(tax.label||'Grupo') + '</div>' +
-      '<div style="font-size:18px;font-weight:700;color:#fff;margin:4px 0;">' + esc(g.nombre) + '</div>' +
-      (g.lat ? '<div style="font-size:11px;color:rgba(255,255,255,0.7);">'+g.lat.toFixed(5)+', '+g.lng.toFixed(5)+(g.alt?' · '+g.alt.toFixed(1)+'m':'')+'</div>' : '') +
+  var html = '<div style="padding:0;background:#131c2e;min-height:100%;">' +
+    '<div style="background:#1a2540;padding:14px 16px;border-bottom:1px solid #253050;">' +
+      '<div style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;">' + esc(tax.label||'Grupo') + '</div>' +
+      '<div style="font-size:17px;font-weight:700;color:#e6edf3;">' + esc(g.nombre) + '</div>' +
+      (g.lat ? '<div style="font-size:11px;color:#7a8aaa;margin-top:3px;">'+g.lat.toFixed(5)+', '+g.lng.toFixed(5)+(g.alt?' · '+g.alt.toFixed(1)+'m':'')+'</div>' : '') +
     '</div>' +
     // Fotos con hallazgos
-    '<div style="padding:16px;">';
+    '<div style="padding:12px;">';
 
   (g.fotos||[]).forEach(function(f) {
     // Resolver URL de imagen desde Supabase Storage
@@ -4008,7 +4046,7 @@ function mostrarPanelGrupoCliente(g) {
     if (!imgFullSrc) { imgFullSrc = imgSrc; }
 
     var fHalls = (f.hallazgos||[]);
-    html += '<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:12px;">';
+    html += '<div style="border:1px solid #253050;border-radius:8px;overflow:hidden;margin-bottom:12px;background:#1a2540;">';
 
     // Foto thumbnail con placeholder si no carga
     if (imgSrc) {
@@ -4023,7 +4061,7 @@ function mostrarPanelGrupoCliente(g) {
     }
 
     html += '<div style="padding:12px;">';
-    html += '<div style="font-size:11px;color:#64748b;margin-bottom:4px;font-family:JetBrains Mono,monospace;">' + esc(f.nombre||f.id) + '</div>';
+    html += '<div style="font-size:11px;color:#7a8aaa;margin-bottom:4px;font-family:JetBrains Mono,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(f.nombre||f.id) + '</div>';
 
     if (f.tipo === 'termica') {
       html += '<span style="background:#f97316;color:#fff;font-size:10px;padding:2px 8px;border-radius:3px;font-weight:600;letter-spacing:0.5px;">TÉRMICA</span>';
@@ -4032,7 +4070,7 @@ function mostrarPanelGrupoCliente(g) {
     }
 
     if (fHalls.length === 0) {
-      html += '<div style="color:#94a3b8;font-size:12px;margin-top:8px;">Sin hallazgos registrados</div>';
+      html += '<div style="color:#7a8aaa;font-size:12px;margin-top:8px;">Sin hallazgos registrados</div>';
     } else {
       fHalls.forEach(function(h) {
         var cc = COND_COLOR[h.condicion] || '#7a8aaa';
@@ -4040,8 +4078,8 @@ function mostrarPanelGrupoCliente(g) {
         html += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px;background:#f8fafc;border-radius:6px;border-left:3px solid '+cc+';">' +
           '<span style="background:'+cc+';color:#fff;font-size:10px;padding:2px 7px;border-radius:3px;font-weight:700;white-space:nowrap;">'+cl.toUpperCase()+'</span>' +
           '<div style="flex:1;min-width:0;">' +
-            '<div style="font-size:13px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(h.descripcion||'—')+'</div>' +
-            (h.comentario ? '<div style="font-size:11px;color:#64748b;margin-top:2px;">'+esc(h.comentario)+'</div>' : '') +
+            '<div style="font-size:13px;font-weight:600;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(h.descripcion||'—')+'</div>' +
+            (h.comentario ? '<div style="font-size:11px;color:#7a8aaa;margin-top:2px;">'+esc(h.comentario)+'</div>' : '') +
           '</div>' +
         '</div>';
       });
@@ -4051,7 +4089,7 @@ function mostrarPanelGrupoCliente(g) {
   });
 
   if ((g.fotos||[]).length === 0) {
-    html += '<div style="text-align:center;color:#94a3b8;padding:24px 0;font-size:13px;">Sin imágenes en este grupo</div>';
+    html += '<div style="text-align:center;color:#7a8aaa;padding:24px 0;font-size:13px;">Sin imágenes en este grupo</div>';
   }
 
   html += '</div></div>';
