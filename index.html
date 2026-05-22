@@ -3286,15 +3286,19 @@ function pdfGrupo(doc, grupo, tipo, W, margin, cW) {
           doc.setDrawColor(col[0], col[1], col[2]);
           doc.setLineWidth(hasCritOrAlto ? 0.8 : 0.5);
           doc.rect(rx, ry, rw, rht, 'S');
-          // Badge del código
-          var lbl = h.codigo;
-          doc.setFontSize(hasCritOrAlto ? 7 : 5);
+          // Badge con código + descripción truncada
+          var fs = hasCritOrAlto ? 7.5 : 6;
+          doc.setFontSize(fs);
           doc.setFont('helvetica','bold');
-          var tw = doc.getTextWidth(lbl) + 3;
+          var desc = h.descripcion ? h.descripcion.substring(0,28) + (h.descripcion.length>28?'…':'') : '';
+          var lbl = h.codigo + (desc ? '  ' + desc : '');
+          var tw = doc.getTextWidth(lbl) + 5;
+          var badgeH = 7;
+          var badgeY = Math.max(y, ry - badgeH);
           doc.setFillColor(col[0], col[1], col[2]);
-          doc.rect(rx, Math.max(y, ry-6), tw, 6, 'F');
+          doc.rect(rx, badgeY, tw, badgeH, 'F');
           doc.setTextColor(255,255,255);
-          doc.text(lbl, rx+1.5, Math.max(y+4.5, ry-1.5));
+          doc.text(lbl, rx + 2.5, badgeY + 5);
           doc.setTextColor(30,30,30);
         });
       } catch(e) {
@@ -4203,27 +4207,20 @@ function generarPDFGrupoCliente(gi) {
     // ── Fotos del grupo ──
     pdfGrupo(doc, g, proyectoActual.tipo, W, margin, cW);
 
-    // ── Firma / certificación ──
-    doc.addPage();
-    pdfRect(doc, 0, 0, W, 26, [255,255,255]);
-    pdfRect(doc, 0, 26, W, 2, [21,101,192]);
-    try { doc.addImage(PEWMA_LOGO_B64, 'JPEG', margin, 2, 40, 22.5); } catch(e) {}
-    pdfText(doc, 'CERTIFICACIÓN', W/2, 10, { size:7, color:[100,116,139], align:'center' });
-    pdfText(doc, g.nombre + ' — Hallazgos', W/2, 20, { size:13, style:'bold', color:[21,101,192], align:'center' });
-
-    var yr = 36;
-    pdfText(doc, 'Este informe fue generado mediante la Plataforma de Inspección Pewma Drone.', margin, yr, { size:8, color:[100,116,139] }); yr += 6;
-    pdfText(doc, 'Los datos de GPS, imágenes y hallazgos fueron relevados en campo por el piloto RPA certificado ANAC.', margin, yr, { size:8, color:[100,116,139] }); yr += 12;
-    var col3r = cW/3;
-    pdfText(doc, 'PILOTO RPA', margin, yr, { size:7, color:[100,116,139] });
-    pdfText(doc, 'CERTIFICACIÓN ANAC', margin+col3r, yr, { size:7, color:[100,116,139] });
-    pdfText(doc, 'AERONAVE / MATRÍCULA', margin+col3r*2, yr, { size:7, color:[100,116,139] });
-    yr += 6;
-    pdfText(doc, proyectoActual.piloto||'—', margin, yr, { size:11, style:'bold', color:[15,23,42] });
-    pdfText(doc, proyectoActual.certAnac||'—', margin+col3r, yr, { size:11, style:'bold', color:[15,23,42] });
-    var aeroLbl = (proyectoActual.equipo||'') + (proyectoActual.matricula ? ' · '+proyectoActual.matricula : '');
-    pdfText(doc, aeroLbl||'—', margin+col3r*2, yr, { size:11, style:'bold', color:[15,23,42] });
-
+    // ── Certificación al pie de página 1 ──
+    var yCert = 262;
+    doc.setDrawColor(226,232,240); doc.setLineWidth(0.3);
+    doc.line(margin, yCert, W-margin, yCert); yCert += 5;
+    pdfText(doc, 'CERTIFICACIÓN', margin, yCert, { size:7, color:[100,116,139] }); yCert += 4;
+    pdfText(doc, 'Generado mediante la Plataforma de Inspección Pewma Drone. Datos GPS e imágenes relevados por piloto certificado ANAC.', margin, yCert, { size:6, color:[100,116,139] }); yCert += 6;
+    var col3c = cW/3;
+    pdfText(doc, 'PILOTO RPA', margin, yCert, { size:6, color:[100,116,139] });
+    pdfText(doc, 'CERTIFICACIÓN ANAC', margin+col3c, yCert, { size:6, color:[100,116,139] });
+    pdfText(doc, 'AERONAVE / MATRÍCULA', margin+col3c*2, yCert, { size:6, color:[100,116,139] }); yCert += 5;
+    pdfText(doc, proyectoActual.piloto||'—', margin, yCert, { size:9, style:'bold', color:[15,23,42] });
+    pdfText(doc, proyectoActual.certAnac||'—', margin+col3c, yCert, { size:9, style:'bold', color:[15,23,42] });
+    var aeroLbl2 = (proyectoActual.equipo||'') + (proyectoActual.matricula ? ' · '+proyectoActual.matricula : '');
+    pdfText(doc, aeroLbl2||'—', margin+col3c*2, yCert, { size:9, style:'bold', color:[15,23,42] });
     pdfFooter(doc, null, g.nombre);
 
     // Guardar
