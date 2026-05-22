@@ -3778,6 +3778,21 @@ function seedData() {
 // ══════════════════════════════════════════════
 function mostrarToast(msg, icon) {
   var t = document.getElementById('toast');
+  if (!t) {
+    // Modo cliente: toast flotante simple
+    var ct = document.getElementById('clienteToast');
+    if (!ct) {
+      ct = document.createElement('div');
+      ct.id = 'clienteToast';
+      ct.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity .3s;';
+      document.body.appendChild(ct);
+    }
+    ct.textContent = (icon||'✅') + ' ' + msg;
+    ct.style.opacity = '1';
+    clearTimeout(ct._t);
+    ct._t = setTimeout(function(){ ct.style.opacity = '0'; }, 3000);
+    return;
+  }
   document.getElementById('toastMsg').textContent  = msg;
   document.getElementById('toastIcon').textContent = icon || '✅';
   t.classList.add('show');
@@ -3905,8 +3920,9 @@ function inicializarMapaCliente() {
 
   var centro = [grupos[0].lat, grupos[0].lng];
   var mapa = L.map('mapaCliente', { zoomControl: true }).setView(centro, 16);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap', maxZoom: 20
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO',
+    subdomains: 'abcd', maxZoom: 20
   }).addTo(mapa);
 
   // Colores por severidad
@@ -3970,23 +3986,17 @@ function mostrarPanelGrupoCliente(g) {
     '<div style="padding:16px;">';
 
   (g.fotos||[]).forEach(function(f) {
-    // Resolver URL de imagen: priorizar storagePathThumb, luego View, luego base64
+    // Resolver URL de imagen desde Supabase Storage
     var imgSrc = null;
     var imgFullSrc = null;
     if (sb) {
-      if (f.storagePathThumb) {
-        imgSrc = sb.storage.from('pewma-fotos').getPublicUrl(f.storagePathThumb).data.publicUrl;
-      } else if (f.storagePathView) {
-        imgSrc = sb.storage.from('pewma-fotos').getPublicUrl(f.storagePathView).data.publicUrl;
-      } else if (f.id) {
-        // Intentar path determinístico
-        imgSrc = sb.storage.from('pewma-fotos').getPublicUrl(f.id+'/thumb.jpg').data.publicUrl;
-      }
-      if (f.storagePathView) {
-        imgFullSrc = sb.storage.from('pewma-fotos').getPublicUrl(f.storagePathView).data.publicUrl;
-      } else if (f.id) {
-        imgFullSrc = sb.storage.from('pewma-fotos').getPublicUrl(f.id+'/view.jpg').data.publicUrl;
-      }
+      var BUCKET = 'pewma-fotos';
+      // Thumb: storagePathThumb > path determinístico > storagePathView
+      var thumbPath = f.storagePathThumb || (f.id ? f.id+'/thumb.jpg' : null);
+      var viewPath  = f.storagePathView  || (f.id ? f.id+'/view.jpg'  : null);
+      if (thumbPath) { imgSrc     = sb.storage.from(BUCKET).getPublicUrl(thumbPath).data.publicUrl; }
+      if (viewPath)  { imgFullSrc = sb.storage.from(BUCKET).getPublicUrl(viewPath).data.publicUrl; }
+      if (!imgSrc && viewPath) { imgSrc = imgFullSrc; }
     }
     if (!imgSrc && f.thumbBase64) { imgSrc = f.thumbBase64; }
     if (!imgFullSrc) { imgFullSrc = imgSrc; }
@@ -3994,9 +4004,16 @@ function mostrarPanelGrupoCliente(g) {
     var fHalls = (f.hallazgos||[]);
     html += '<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:12px;">';
 
-    // Foto thumbnail — click abre fullscreen
+    // Foto thumbnail con placeholder si no carga
     if (imgSrc) {
-      html += '<img src="'+imgSrc+'" style="width:100%;height:180px;object-fit:cover;display:block;cursor:zoom-in;" data-src="'+(imgFullSrc||imgSrc)+'" onclick="abrirFotoClienteEvt(this)" onerror="this.style.display=\'none\'">';
+      html += '<div style="position:relative;">' +
+        '<img src="'+imgSrc+'" style="width:100%;height:180px;object-fit:cover;display:block;cursor:zoom-in;border-radius:0;" ' +
+          'data-full="'+(imgFullSrc||imgSrc)+'" onclick="abrirFotoClienteEvt(this)" ' +
+          'onerror="this.outerHTML=\'<div style=\\\"height:80px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:24px;\\\">📷</div>\'">' +
+        '<div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,0.55);color:#fff;font-size:10px;padding:2px 7px;border-radius:3px;">🔍 Ver foto</div>' +
+      '</div>';
+    } else {
+      html += '<div style="height:60px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:22px;">📷</div>';
     }
 
     html += '<div style="padding:12px;">';
@@ -4036,7 +4053,7 @@ function mostrarPanelGrupoCliente(g) {
 }
 
 function abrirFotoClienteEvt(el) {
-  abrirFotoCliente(el.getAttribute('data-src'));
+  abrirFotoCliente(el.getAttribute('data-full') || el.getAttribute('data-src') || el.src);
 }
 function abrirFotoCliente(src) {
   var overlay = document.createElement('div');
