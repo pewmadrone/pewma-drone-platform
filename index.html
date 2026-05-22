@@ -139,6 +139,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   display:flex;align-items:center;justify-content:center;transition:all .15s}
 .project-card:hover .card-share{color:var(--muted);border-color:var(--border);background:var(--surf2)}
 .card-share:hover{color:var(--accent)!important;border-color:var(--accent)!important;background:rgba(21,101,192,.1)!important}
+.card-edit{position:absolute;top:42px;right:36px;width:22px;height:22px;
+  background:transparent;border:1px solid transparent;border-radius:4px;
+  color:transparent;font-size:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .15s}
+.project-card:hover .card-edit{color:var(--muted);border-color:var(--border);background:var(--surf2)}
+.card-edit:hover{color:var(--acc2)!important;border-color:var(--acc2)!important;background:rgba(25,118,210,.1)!important}
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
   min-height:380px;text-align:center;gap:12px;grid-column:1/-1}
 .empty-icon{width:72px;height:72px;background:var(--surface);border:1px solid var(--border);
@@ -834,22 +840,110 @@ html,body{height:100%;background:var(--bg);color:var(--text);
       <div class="form-row">
         <div class="form-group" style="margin-bottom:0"><label class="form-label">Fecha de vuelo</label><input class="form-input" id="fFecha" type="date"></div>
         <div class="form-group" style="margin-bottom:0"><label class="form-label">Equipo</label>
-          <select class="form-select" id="fEquipo">
+          <select class="form-select" id="fEquipo" onchange="actualizarMatricula()">
             <option value="M4T">DJI Matrice 4 Thermal</option>
             <option value="Air3S">DJI Air 3S</option>
-            <option value="Ambos">Ambos</option>
+            <option value="NazgulECO">NazgulECO FPV</option>
+            <option value="Cinebot30">Cinebot30 FPV</option>
+            <option value="Ambos">Múltiples equipos</option>
           </select>
         </div>
       </div>
       <div style="height:12px"></div>
       <div class="form-row">
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">Piloto RPA</label><input class="form-input" id="fPiloto" type="text" value="Emanuel Sorribe"></div>
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">Matrícula ANAC</label><input class="form-input" id="fMatricula" type="text" placeholder="LV-R2622"></div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Piloto RPA</label>
+          <select class="form-select" id="fPiloto" onchange="actualizarCertAnac()">
+            <option value="Emanuel Sorribe">Emanuel Sorribe</option>
+            <option value="otro">Otro piloto...</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Certificación ANAC</label>
+          <input class="form-input" id="fCertAnac" type="text" placeholder="Ej: RPA-XXXX" value="RAAC 100/101/102">
+        </div>
+      </div>
+      <div style="height:8px"></div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Matrícula aeronave</label>
+          <input class="form-input" id="fMatricula" type="text" readonly style="background:var(--surf2);color:var(--muted);">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Observaciones</label>
+          <input class="form-input" id="fObs" type="text" placeholder="Opcional">
+        </div>
       </div>
     </div>
     <div class="modal-ftr">
       <button class="btn btn-secondary" onclick="cerrarModalNuevo()">Cancelar</button>
       <button class="btn btn-primary" onclick="crearProyecto()">Crear proyecto →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL EDITAR PROYECTO ══ -->
+<div class="modal-overlay" id="modalEditar" onclick="if(event.target===this)cerrarModalEditar()">
+  <div class="modal">
+    <div class="modal-hdr">
+      <span class="modal-title">Editar Proyecto</span>
+      <button class="modal-close" onclick="cerrarModalEditar()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nombre del proyecto *</label>
+        <input class="form-input" id="eNombre" type="text">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cliente</label>
+        <input class="form-input" id="eCliente" type="text">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">Fecha de vuelo</label><input class="form-input" id="eFecha" type="date"></div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Equipo</label>
+          <select class="form-select" id="eEquipo" onchange="actualizarMatriculaEdit()">
+            <option value="M4T">DJI Matrice 4 Thermal</option>
+            <option value="Air3S">DJI Air 3S</option>
+            <option value="NazgulECO">NazgulECO FPV</option>
+            <option value="Cinebot30">Cinebot30 FPV</option>
+            <option value="Ambos">Múltiples equipos</option>
+          </select>
+        </div>
+      </div>
+      <div style="height:8px"></div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Piloto RPA</label>
+          <select class="form-select" id="ePiloto">
+            <option value="Emanuel Sorribe">Emanuel Sorribe</option>
+            <option value="otro">Otro piloto...</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Certificación ANAC</label>
+          <input class="form-input" id="eCertAnac" type="text">
+        </div>
+      </div>
+      <div style="height:8px"></div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Matrícula aeronave</label>
+          <input class="form-input" id="eMatricula" type="text" readonly style="background:var(--surf2);color:var(--muted);">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Estado</label>
+          <select class="form-select" id="eEstado">
+            <option value="borrador">Borrador</option>
+            <option value="en_curso">En curso</option>
+            <option value="completado">Completado</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-secondary" onclick="cerrarModalEditar()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEdicionProyecto()">Guardar cambios →</button>
     </div>
   </div>
 </div>
@@ -1440,6 +1534,7 @@ function buildCard(p) {
   var fecha= p.fechaVuelo ? new Date(p.fechaVuelo+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—';
   return '<div class="project-card" onclick="irAProyecto(\''+p.id+'\')">'+
     '<div class="card-bar '+barT+'"></div>'+
+    '<button class="card-edit" title="Editar proyecto" onclick="event.stopPropagation();abrirModalEditar(\''+p.id+'\')">✏</button>'+
     '<button class="card-del" onclick="event.stopPropagation();eliminarProyecto(\''+p.id+'\')">🗑</button>'+
     '<button class="card-share" title="Compartir con cliente" onclick="event.stopPropagation();copiarLinkCliente(\''+p.id+'\')">🔗</button>'+
     '<div class="card-body">'+
@@ -1487,20 +1582,96 @@ function eliminarProyecto(id) {
 // ══════════════════════════════════════════════
 // MODAL NUEVO PROYECTO
 // ══════════════════════════════════════════════
+// Matrículas por equipo
+var MATRICULAS = {
+  M4T:       'LV-R2622',
+  Air3S:     'LV-R2519',
+  NazgulECO: 'LV-R1619',
+  Cinebot30: 'LV-R1619',
+  Ambos:     'Múltiples'
+};
+
+function actualizarMatricula() {
+  var eq = document.getElementById('fEquipo').value;
+  document.getElementById('fMatricula').value = MATRICULAS[eq] || '';
+}
+function actualizarMatriculaEdit() {
+  var eq = document.getElementById('eEquipo').value;
+  document.getElementById('eMatricula').value = MATRICULAS[eq] || '';
+}
+function actualizarCertAnac() {
+  var piloto = document.getElementById('fPiloto').value;
+  if (piloto === 'Emanuel Sorribe') {
+    document.getElementById('fCertAnac').value = 'RAAC 100/101/102';
+  }
+}
+
 function abrirModalNuevo() {
   tipoSeleccionado = null;
-  document.getElementById('fNombre').value   = '';
-  document.getElementById('fCliente').value  = '';
-  document.getElementById('fFecha').value    = new Date().toISOString().split('T')[0];
-  document.getElementById('fEquipo').value   = 'M4T';
-  document.getElementById('fPiloto').value   = 'Emanuel Sorribe';
-  document.getElementById('fMatricula').value= '';
+  document.getElementById('fNombre').value    = '';
+  document.getElementById('fCliente').value   = '';
+  document.getElementById('fFecha').value     = new Date().toISOString().split('T')[0];
+  document.getElementById('fEquipo').value    = 'M4T';
+  document.getElementById('fPiloto').value    = 'Emanuel Sorribe';
+  document.getElementById('fCertAnac').value  = 'RAAC 100/101/102';
+  document.getElementById('fMatricula').value = 'LV-R2622';
+  document.getElementById('fObs').value       = '';
   document.querySelectorAll('.tipo-btn').forEach(function(b){ b.classList.remove('selected'); });
   document.getElementById('taxPreview').style.display = 'none';
   document.getElementById('modalNuevo').classList.add('open');
   setTimeout(function(){ document.getElementById('fNombre').focus(); }, 80);
 }
 function cerrarModalNuevo() { document.getElementById('modalNuevo').classList.remove('open'); }
+
+// ── Modal editar proyecto ──
+var proyectoEditandoId = null;
+
+function abrirModalEditar(pid) {
+  var all = getProyectos();
+  var p = all.find(function(x){ return x.id === pid; });
+  if (!p) { return; }
+  proyectoEditandoId = pid;
+  document.getElementById('eNombre').value   = p.nombre   || '';
+  document.getElementById('eCliente').value  = p.cliente  || '';
+  document.getElementById('eFecha').value    = p.fechaVuelo || '';
+  document.getElementById('eEquipo').value   = p.equipo   || 'M4T';
+  document.getElementById('eMatricula').value= p.matricula|| MATRICULAS[p.equipo]||'';
+  document.getElementById('ePiloto').value   = p.piloto   || 'Emanuel Sorribe';
+  document.getElementById('eCertAnac').value = p.certAnac || 'RAAC 100/101/102';
+  document.getElementById('eEstado').value   = p.estado   || 'borrador';
+  document.getElementById('modalEditar').classList.add('open');
+  setTimeout(function(){ document.getElementById('eNombre').focus(); }, 80);
+}
+
+function cerrarModalEditar() {
+  document.getElementById('modalEditar').classList.remove('open');
+  proyectoEditandoId = null;
+}
+
+function guardarEdicionProyecto() {
+  var nombre = document.getElementById('eNombre').value.trim();
+  if (!nombre) { shake(document.getElementById('eNombre')); mostrarToast('Ingresá un nombre.','⚠️'); return; }
+  var all = getProyectos();
+  var idx = all.findIndex(function(x){ return x.id === proyectoEditandoId; });
+  if (idx === -1) { return; }
+  all[idx].nombre      = nombre;
+  all[idx].cliente     = document.getElementById('eCliente').value.trim();
+  all[idx].fechaVuelo  = document.getElementById('eFecha').value;
+  all[idx].equipo      = document.getElementById('eEquipo').value;
+  all[idx].matricula   = document.getElementById('eMatricula').value.trim();
+  all[idx].piloto      = document.getElementById('ePiloto').value.trim();
+  all[idx].certAnac    = document.getElementById('eCertAnac').value.trim();
+  all[idx].estado      = document.getElementById('eEstado').value;
+  saveProyectos(all);
+  // Si el proyecto editado es el activo, actualizarlo
+  if (proyectoActual && proyectoActual.id === proyectoEditandoId) {
+    proyectoActual = JSON.parse(JSON.stringify(all[idx]));
+  }
+  cerrarModalEditar();
+  actualizarStats(); renderProyectos();
+  guardarProyectoSupabase(all[idx]).catch(function(){});
+  mostrarToast('Proyecto actualizado.','✅');
+}
 
 function selTipo(btn) {
   document.querySelectorAll('.tipo-btn').forEach(function(b){ b.classList.remove('selected'); });
@@ -1527,7 +1698,9 @@ function crearProyecto() {
     fechaVuelo: document.getElementById('fFecha').value,
     equipo: document.getElementById('fEquipo').value,
     piloto: document.getElementById('fPiloto').value.trim(),
+    certAnac: document.getElementById('fCertAnac').value.trim(),
     matricula: document.getElementById('fMatricula').value.trim(),
+    observaciones: document.getElementById('fObs').value.trim(),
     estado: 'borrador',
     totalImagenes:0, imagenesEvaluadas:0, totalHallazgos:0, hallazgosCriticos:0, hallazgosAltos:0,
     creadoEn: new Date().toISOString(),
@@ -2946,7 +3119,7 @@ function pdfPortada(doc, W, margin, cW, tipo) {
   pdfField('EQUIPO', proyectoActual.equipo||'—', margin+col*2, y);
   y += 16;
   pdfField('PILOTO RPA', proyectoActual.piloto||'—', margin, y);
-  pdfField('CERTIFICACIÓN ANAC', proyectoActual.matricula||'—', margin+col, y);
+  pdfField('CERTIFICACIÓN ANAC', proyectoActual.certAnac||proyectoActual.matricula||'—', margin+col, y);
   pdfField('FECHA DE EMISIÓN', new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'}), margin+col*2, y);
   y += 16;
 
@@ -3089,6 +3262,19 @@ function pdfGrupo(doc, grupo, tipo, W, margin, cW) {
       try {
         var b64 = pdfImgSrc.split(',')[1] || pdfImgSrc;
         doc.addImage(b64, 'JPEG', imgX, y, imgW, imgH);
+        // Watermark semitransparente esquina inferior derecha
+        try {
+          doc.saveGraphicsState();
+          doc.setGState(new doc.GState({opacity:0.5}));
+          doc.setFontSize(hasCritOrAlto ? 8 : 6);
+          doc.setFont('helvetica','bold');
+          doc.setTextColor(255,255,255);
+          var wmTxt = 'pewmadrone.com';
+          var wmW = doc.getTextWidth(wmTxt);
+          doc.text(wmTxt, imgX + imgW - wmW - 2, y + imgH - 2);
+          doc.restoreGraphicsState();
+          doc.setTextColor(0,0,0); // reset
+        } catch(we) {}
         // Dibujar anotaciones (bboxes) sobre la imagen en el PDF
         halls.forEach(function(h) {
           if (!h.bbox) { return; }
@@ -3908,6 +4094,10 @@ function construirVistaCliente(p) {
         '<div style="flex:1;min-width:0;">' +
           '<div style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;">'+esc(tax.label)+'</div>' +
           '<div style="font-size:14px;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(p.nombre)+'</div>' +
+          '<div style="font-size:11px;color:#7a8aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+
+            esc(p.cliente||'') +
+            (p.fechaVuelo ? ' · ' + new Date(p.fechaVuelo+'T12:00:00').toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}) : '') +
+          '</div>' +
         '</div>' +
         '<div style="display:flex;gap:14px;flex-shrink:0;">' +
           '<div style="text-align:center;"><div style="font-size:15px;font-weight:700;color:#e6edf3;">'+totalHalls+'</div><div style="font-size:9px;color:#7a8aaa;">HALLAZGOS</div></div>' +
