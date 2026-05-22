@@ -1241,7 +1241,7 @@ async function cargarProyectosSupabase() {
       return {
         id: p.id, nombre: p.nombre, cliente: p.cliente, tipo: p.tipo,
         fechaVuelo: p.fecha_vuelo, equipo: p.equipo, piloto: p.piloto,
-        matricula: p.matricula, estado: p.estado,
+        matricula: p.matricula, certAnac: p.cert_anac||null, estado: p.estado,
         totalImagenes: p.total_imagenes||0, imagenesEvaluadas: p.imagenes_evaluadas||0,
         totalHallazgos: p.total_hallazgos||0, hallazgosCriticos: p.hallazgos_criticos||0,
         hallazgosAltos: p.hallazgos_altos||0, creadoEn: p.created_at,
@@ -1306,6 +1306,7 @@ async function syncProyectoSupabase(proyecto) {
       id: proyecto.id, nombre: proyecto.nombre, cliente: proyecto.cliente,
       tipo: proyecto.tipo, fecha_vuelo: proyecto.fechaVuelo||null,
       equipo: proyecto.equipo, piloto: proyecto.piloto, matricula: proyecto.matricula,
+      cert_anac: proyecto.certAnac||null,
       estado: proyecto.estado,
       total_imagenes: proyecto.totalImagenes||0,
       imagenes_evaluadas: proyecto.imagenesEvaluadas||0,
@@ -4218,11 +4219,10 @@ function generarPDFGrupoCliente(gi) {
     pdfText(doc, 'CERTIFICACIÓN ANAC', margin+col3c, yCert, { size:6, color:[100,116,139] });
     pdfText(doc, 'AERONAVE / MATRÍCULA', margin+col3c*2, yCert, { size:6, color:[100,116,139] }); yCert += 5;
     pdfText(doc, proyectoActual.piloto||'—', margin, yCert, { size:9, style:'bold', color:[15,23,42] });
-    pdfText(doc, proyectoActual.certAnac||'—', margin+col3c, yCert, { size:9, style:'bold', color:[15,23,42] });
+    var certVal = proyectoActual.certAnac || (proyectoActual.piloto==='Emanuel Sorribe' ? 'RAAC 100/101/102' : '—');
+    pdfText(doc, certVal, margin+col3c, yCert, { size:9, style:'bold', color:[15,23,42] });
     var aeroLbl2 = (proyectoActual.equipo||'') + (proyectoActual.matricula ? ' · '+proyectoActual.matricula : '');
     pdfText(doc, aeroLbl2||'—', margin+col3c*2, yCert, { size:9, style:'bold', color:[15,23,42] });
-    pdfFooter(doc, null, g.nombre);
-
     // Guardar
     var fname = 'Pewma_Drone_'+proyectoActual.nombre.replace(/\s+/g,'_')+'_'+g.nombre.replace(/\s+/g,'_')+'.pdf';
     doc.save(fname);
