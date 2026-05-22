@@ -3942,8 +3942,7 @@ function clienteStat(val, label, color) {
 
 function selGrupoCliente(gi) {
   var g = (proyectoActual.grupos||[])[gi];
-  if (!g) { return; }
-  // Marcar activo en sidebar
+  if (!g) { console.warn('selGrupoCliente: grupo '+gi+' no encontrado'); return; }
   document.querySelectorAll('.cg-item').forEach(function(el){ el.classList.remove('activo'); });
   var el = document.getElementById('cg-'+gi);
   if (el) { el.classList.add('activo'); }
@@ -4008,8 +4007,11 @@ function inicializarMapaCliente() {
 }
 
 function mostrarPanelGrupoCliente(g) {
-  var panel = document.getElementById('panelCliente');
-  var sb = window.sb || sb;
+  var panel = document.getElementById('cPanel');
+  if (!panel) { console.warn('cPanel no encontrado'); return; }
+  panel.style.alignItems = 'flex-start';
+  panel.style.justifyContent = 'flex-start';
+  var sb = window.sb;
   var tax = (window.TAXONOMIAS && TAXONOMIAS[proyectoActual.tipo]) ? TAXONOMIAS[proyectoActual.tipo] : {};
 
   var halls = [];
@@ -4095,6 +4097,8 @@ function mostrarPanelGrupoCliente(g) {
   }
 
   html += '</div></div>';
+  panel.style.alignItems = 'flex-start';
+  panel.style.justifyContent = 'flex-start';
   panel.innerHTML = html;
 }
 
