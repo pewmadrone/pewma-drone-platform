@@ -4402,7 +4402,7 @@ function generarPDFGrupoCliente(gi) {
     doc.line(margin, y, W-margin, y); y += 8;
 
     // ── Fotos del grupo ──
-    pdfGrupo(doc, g, proyectoActual.tipo, W, margin, cW);
+    pdfGrupo(doc, g, 'completo', W, margin, cW);
 
     // ── Certificación al pie de página 1 ──
     var yCert = 262;
