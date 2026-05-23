@@ -3403,6 +3403,7 @@ function pdfGrupo(doc, grupo, tipo, W, margin, cW) {
     if (tipo === 'completo') { return true; }
     var halls = f.hallazgos || [];
     if (tipo === 'con_hallazgos') { return halls.length > 0; }
+    if (tipo === 'relevantes') { return halls.some(function(h){ return h.condicion==='critico'||h.condicion==='alto'||h.condicion==='moderado'; }); }
     return halls.some(function(h){ return h.condicion==='critico'||h.condicion==='alto'; });
   });
 
@@ -3415,6 +3416,7 @@ function pdfGrupo(doc, grupo, tipo, W, margin, cW) {
   fotos.forEach(function(f) {
     var halls = (f.hallazgos||[]).filter(function(h) {
       if (tipo === 'criticos') { return h.condicion==='critico'||h.condicion==='alto'; }
+      if (tipo === 'relevantes') { return h.condicion==='critico'||h.condicion==='alto'||h.condicion==='moderado'; }
       return true;
     });
 
@@ -4401,8 +4403,8 @@ function generarPDFGrupoCliente(gi) {
     doc.setDrawColor(226,232,240);
     doc.line(margin, y, W-margin, y); y += 8;
 
-    // ── Fotos del grupo ──
-    pdfGrupo(doc, g, 'completo', W, margin, cW);
+    // ── Fotos del grupo ── solo hallazgos relevantes (moderado/alto/crítico)
+    pdfGrupo(doc, g, 'relevantes', W, margin, cW);
 
     // ── Certificación al pie de página 1 ──
     var yCert = 262;
