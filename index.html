@@ -145,6 +145,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   display:flex;align-items:center;justify-content:center;transition:all .15s}
 .project-card:hover .card-edit{color:var(--muted);border-color:var(--border);background:var(--surf2)}
 .card-edit:hover{color:var(--acc2)!important;border-color:var(--acc2)!important;background:rgba(25,118,210,.1)!important}
+.card-dup{position:absolute;top:16px;right:36px;width:22px;height:22px;
+  background:transparent;border:1px solid transparent;border-radius:4px;
+  color:transparent;font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .15s}
+.project-card:hover .card-dup{color:var(--muted);border-color:var(--border);background:var(--surf2)}
+.card-dup:hover{color:#22c55e!important;border-color:#22c55e!important;background:rgba(34,197,94,.1)!important}
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
   min-height:380px;text-align:center;gap:12px;grid-column:1/-1}
 .empty-icon{width:72px;height:72px;background:var(--surface);border:1px solid var(--border);
@@ -321,6 +327,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .12s}
 .sb-foto-item:hover .sb-foto-del{color:var(--muted)}
 .sb-foto-del:hover{color:var(--crit)!important;background:rgba(239,68,68,.1)}
+.sb-orden-btn{width:16px;height:14px;flex-shrink:0;background:transparent;border:none;
+  color:transparent;font-size:8px;cursor:pointer;padding:0;line-height:1;border-radius:2px;transition:all .1s}
+.sb-foto-item:hover .sb-orden-btn{color:var(--muted)}
+.sb-orden-btn:hover{color:var(--accent)!important;background:rgba(21,101,192,.15)!important}
 
 .sb-content{flex:1;overflow-y:auto}
 .sb-empty{padding:24px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6}
@@ -1689,6 +1699,7 @@ function buildCard(p) {
   return '<div class="project-card" onclick="irAProyecto(\''+p.id+'\')">'+
     '<div class="card-bar '+barT+'"></div>'+
     '<button class="card-edit" title="Editar proyecto" onclick="event.stopPropagation();abrirModalEditar(\''+p.id+'\')">✏</button>'+
+    '<button class="card-dup" title="Duplicar estructura" onclick="event.stopPropagation();duplicarProyecto(\''+p.id+'\')">⧉</button>'+
     '<button class="card-del" onclick="event.stopPropagation();eliminarProyecto(\''+p.id+'\')">🗑</button>'+
     '<button class="card-share" title="Compartir con cliente" onclick="event.stopPropagation();copiarLinkCliente(\''+p.id+'\')">🔗</button>'+
     '<div class="card-body">'+
@@ -1715,6 +1726,47 @@ function setFiltro(f, btn) {
   document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
   renderProyectos();
+}
+
+function duplicarProyecto(id) {
+  var all = getProyectos();
+  var orig = all.find(function(p){ return p.id === id; });
+  if (!orig) { return; }
+  var ts = Date.now();
+  var gruposCopia = (orig.grupos||[]).map(function(g, gi) {
+    return { id:'g_'+ts+'_'+gi, nombre:g.nombre, icon:g.icon||null,
+      lat:g.lat||null, lng:g.lng||null, alt:g.alt||null, fotos:[], videos:[] };
+  });
+  var nuevo = {
+    id:'p_'+ts, nombre:orig.nombre+' (copia)', cliente:orig.cliente||'',
+    tipo:orig.tipo, fechaVuelo:orig.fechaVuelo||'', equipo:orig.equipo,
+    piloto:orig.piloto, matricula:orig.matricula, certAnac:orig.certAnac||'',
+    observaciones:orig.observaciones||'', estado:'borrador', grupos:gruposCopia,
+    totalImagenes:0, imagenesEvaluadas:0, totalHallazgos:0,
+    hallazgosCriticos:0, hallazgosAltos:0, creadoEn:new Date().toISOString()
+  };
+  all.unshift(nuevo);
+  saveProyectos(all);
+  renderProyectos();
+  var prevP = proyectoActual;
+  proyectoActual = nuevo;
+  guardarProyecto(true);
+  proyectoActual = prevP;
+  mostrarToast('Proyecto duplicado — estructura copiada sin fotos', '⧉');
+}
+
+function moverFoto(gid, fid, dir) {
+  var g = (proyectoActual.grupos||[]).find(function(x){ return x.id===gid; });
+  if (!g || !g.fotos) { return; }
+  var idx = g.fotos.findIndex(function(f){ return f.id===fid; });
+  if (idx < 0) { return; }
+  var newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= g.fotos.length) { return; }
+  var tmp = g.fotos[idx];
+  g.fotos[idx] = g.fotos[newIdx];
+  g.fotos[newIdx] = tmp;
+  guardarProyecto(true);
+  renderSidebar();
 }
 
 function eliminarProyecto(id) {
@@ -2058,6 +2110,10 @@ function buildFotoItem(f, gid, gpsRefId) {
         '<span class="sb-tipo-badge '+(f.tipoM4T||'V')+'">'+(f.tipoM4T||'V')+'</span>'+
         (isRef ? '<span class="sb-gps-ref">📍 GPS ref</span>' : '')+'</div>'+
       (dots ? '<div class="sb-dots">'+dots+'</div>' : '')+
+    '</div>'+
+    '<div style="display:flex;flex-direction:column;gap:1px;margin-right:2px;">'+
+    '<button class="sb-orden-btn" title="Subir" onclick="event.stopPropagation();moverFoto(\''+gid+'\',\''+f.id+'\',-1)">▲</button>'+
+    '<button class="sb-orden-btn" title="Bajar" onclick="event.stopPropagation();moverFoto(\''+gid+'\',\''+f.id+'\',1)">▼</button>'+
     '</div>'+
     '<button class="sb-foto-del" onclick="event.stopPropagation();eliminarFoto(\''+gid+'\',\''+f.id+'\')">🗑</button>'+
   '</div>';
@@ -4674,6 +4730,43 @@ function mostrarPanelGrupoCliente(g) {
 
   if ((g.fotos||[]).length === 0) {
     html += '<div style="text-align:center;color:#7a8aaa;padding:24px 0;font-size:13px;">Sin imágenes en este grupo</div>';
+  }
+
+  // Videos del grupo
+  var gVideosC = (g.videos||[]);
+  if (gVideosC.length > 0) {
+    html += '<div style="padding:10px 10px 4px;border-top:1px solid #253050;margin-top:4px;">'
+      + '<div style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">🎥 Videos del grupo</div>';
+    gVideosC.forEach(function(v) {
+      var vUrl = null;
+      if (sb) {
+        var vPath = v.storagePathVideo || (v.id ? v.id+'/video.mp4' : null);
+        if (vPath) { vUrl = sb.storage.from('pewma-fotos').getPublicUrl(vPath).data.publicUrl; }
+      }
+      var dur = v.duracion ? (Math.floor(v.duracion/60)+':'+(Math.round(v.duracion%60)<10?'0':'')+Math.round(v.duracion%60)) : '';
+      var sz  = v.tamano ? (v.tamano>1048576 ? Math.round(v.tamano/1048576)+'MB' : Math.round(v.tamano/1024)+'KB') : '';
+      html += '<div style="border:1px solid #253050;border-radius:8px;overflow:hidden;background:#1a2540;margin-bottom:8px;">';
+      if (vUrl) {
+        html += '<video controls preload="metadata" style="width:100%;max-height:220px;background:#000;display:block;"'
+          + ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+          + '<source src="'+vUrl+'" type="video/mp4"></video>'
+          + '<div style="display:none;align-items:center;justify-content:center;height:80px;color:#7a8aaa;font-size:13px;flex-direction:column;gap:8px;">'
+          + '<span>⚠️ No se puede reproducir</span>'
+          + '<a href="'+vUrl+'" download style="color:#1565c0;font-size:12px;text-decoration:none;">⬇ Descargar video</a>'
+          + '</div>';
+      } else {
+        html += '<div style="display:flex;align-items:center;justify-content:center;height:80px;color:#7a8aaa;font-size:13px;">Sin URL disponible</div>';
+      }
+      html += '<div style="padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+        + '<div style="min-width:0;">'
+        + '<div style="font-size:11px;color:#b0bec5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:JetBrains Mono,monospace;">'+esc(v.nombre||v.id)+'</div>'
+        + (dur||sz ? '<div style="font-size:10px;color:#7a8aaa;margin-top:2px;">'+(dur?'⏱ '+dur:'')+(dur&&sz?' · ':'')+(sz?sz:'')+'</div>' : '')
+        + '</div>'
+        + (vUrl ? '<a href="'+vUrl+'" download title="Descargar" style="color:#7a8aaa;font-size:18px;text-decoration:none;flex-shrink:0;">⬇</a>' : '')
+        + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
   }
 
   html += '</div></div>';
