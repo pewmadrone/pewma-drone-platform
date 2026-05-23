@@ -1107,35 +1107,82 @@ var TAXONOMIAS = {
   },
   og:{ icon:'🛢', label:'Ducto O&G',
     grupos:[
-      { grupo:'D — Ducto / Cañería', codigos:[
-        {cod:'D01', desc:'Daño externo en cañería'},
-        {cod:'D02', desc:'Corrosión en ducto'},
-        {cod:'D03', desc:'Fuga o mancha de hidrocarburo'}
+      { grupo:'C — Corrosión / Revestimiento', codigos:[
+        {cod:'C01', desc:'Corrosión externa visible en cañería'},
+        {cod:'C02', desc:'Daño o pérdida de revestimiento (coating)'},
+        {cod:'C03', desc:'Anomalía térmica compatible con CUI (corrosión bajo aislamiento)'},
+        {cod:'C04', desc:'Corrosión en estructura metálica de soporte'}
       ]},
-      { grupo:'I — Infraestructura', codigos:[
-        {cod:'I01', desc:'Válvula con daño'},
-        {cod:'I02', desc:'Señalización deteriorada'},
-        {cod:'I03', desc:'Intrusión en faja de seguridad'}
+      { grupo:'F — Fuga / Derrame', codigos:[
+        {cod:'F01', desc:'Mancha de hidrocarburo líquido en suelo'},
+        {cod:'F02', desc:'Anomalía térmica compatible con fuga de gas (punto frío)'},
+        {cod:'F03', desc:'Derrame activo visible (crudo / agua de formación)'},
+        {cod:'F04', desc:'Contaminación de suelo por derrame histórico'}
+      ]},
+      { grupo:'D — Derecho de vía (ROW)', codigos:[
+        {cod:'D01', desc:'Vegetación invasiva sobre la traza'},
+        {cod:'D02', desc:'Actividad de terceros / construcción no autorizada'},
+        {cod:'D03', desc:'Cruce o huella vehicular no autorizada sobre traza'},
+        {cod:'D04', desc:'Señalización de traza faltante o dañada'},
+        {cod:'D05', desc:'Cañería expuesta / descubierta'}
+      ]},
+      { grupo:'G — Geohazard / Terreno', codigos:[
+        {cod:'G01', desc:'Erosión hídrica sobre o junto a la traza'},
+        {cod:'G02', desc:'Subsidencia / movimiento de suelo'},
+        {cod:'G03', desc:'Cruce de agua comprometido (socavación)'},
+        {cod:'G04', desc:'Exposición de cañería por erosión'}
+      ]},
+      { grupo:'I — Infraestructura de superficie', codigos:[
+        {cod:'I01', desc:'Válvula con daño o pérdida visible'},
+        {cod:'I02', desc:'Anomalía térmica en manifold / conexiones'},
+        {cod:'I03', desc:'Tanque con daño estructural visible'},
+        {cod:'I04', desc:'Wellhead / cabezal con condición anómala'},
+        {cod:'I05', desc:'Pérdida de contención en pileta o batea'}
+      ]},
+      { grupo:'S — Señalización / Seguridad perimetral', codigos:[
+        {cod:'S01', desc:'Cartel de señalización faltante o ilegible'},
+        {cod:'S02', desc:'Hito de ducto faltante o desplazado'},
+        {cod:'S03', desc:'Cerca perimetral dañada o comprometida'}
       ]}
     ],
     codigos: function(){ return this.grupos.reduce(function(a,g){ return a.concat(g.codigos); },[]); }
   },
   solar:{ icon:'☀️', label:'Solar / FV',
     grupos:[
-      { grupo:'P — Paneles', codigos:[
-        {cod:'P01', desc:'Panel con punto caliente (hotspot)'},
-        {cod:'P02', desc:'Panel con celda dañada o rota'},
-        {cod:'P03', desc:'Panel con suciedad severa o sombra'}
+      { grupo:'H — Hotspot (punto caliente)', codigos:[
+        {cod:'H01', desc:'Hotspot en celda única'},
+        {cod:'H02', desc:'Hotspot en sub-string (1/3 del módulo caliente)'},
+        {cod:'H03', desc:'Módulo completo con temperatura elevada'},
+        {cod:'H04', desc:'Hotspot en caja de conexiones (junction box)'}
       ]},
-      { grupo:'S — Estructura soporte', codigos:[
-        {cod:'S01', desc:'Estructura con corrosión'},
-        {cod:'S02', desc:'Tornillería floja o faltante'},
-        {cod:'S03', desc:'Estructura desalineada'}
+      { grupo:'D — Diodo de bypass', codigos:[
+        {cod:'D01', desc:'Falla en diodo de bypass'},
+        {cod:'D02', desc:'Sub-string apagado / sin conducción'}
       ]},
-      { grupo:'E — Eléctrico', codigos:[
-        {cod:'E01', desc:'String apagado o sin producción'},
-        {cod:'E02', desc:'Cableado con daño o exposición'},
-        {cod:'E03', desc:'Inversor con anomalía térmica'}
+      { grupo:'P — PID (Degradación inducida por potencial)', codigos:[
+        {cod:'P01', desc:'Patrón PID en celda (degradación por alto voltaje)'},
+        {cod:'P02', desc:'String con pérdida de producción por PID generalizado'}
+      ]},
+      { grupo:'S — String / circuito', codigos:[
+        {cod:'S01', desc:'String con temperatura elevada vs. referencia'},
+        {cod:'S02', desc:'String apagado / sin producción'},
+        {cod:'S03', desc:'Desbalance entre strings del mismo inversor'}
+      ]},
+      { grupo:'M — Módulo / Panel (visual RGB)', codigos:[
+        {cod:'M01', desc:'Vidrio roto o fisurado'},
+        {cod:'M02', desc:'Suciedad severa / acumulación de polvo'},
+        {cod:'M03', desc:'Deyección de aves'},
+        {cod:'M04', desc:'Delaminación / burbuja en encapsulante'},
+        {cod:'M05', desc:'Panel desalineado o suelto de la estructura'}
+      ]},
+      { grupo:'V — Vegetación / sombreado externo', codigos:[
+        {cod:'V01', desc:'Sombra por vegetación no controlada'},
+        {cod:'V02', desc:'Sombra por obstáculo externo (estructura, edificio)'}
+      ]},
+      { grupo:'E — Estructura / soporte', codigos:[
+        {cod:'E01', desc:'Estructura con corrosión'},
+        {cod:'E02', desc:'Tornillería floja o faltante'},
+        {cod:'E03', desc:'Cableado expuesto o con daño visible'}
       ]}
     ],
     codigos: function(){ return this.grupos.reduce(function(a,g){ return a.concat(g.codigos); },[]); }
@@ -3372,7 +3419,7 @@ function pdfGrupo(doc, grupo, tipo, W, margin, cW) {
     });
 
     // Verificar si cabe en la página actual o saltar
-    var hasCritOrAltoCheck = halls.some(function(h){ return h.condicion==='critico'||h.condicion==='alto'; });
+    var hasCritOrAltoCheck = halls.some(function(h){ return h.condicion==='critico'||h.condicion==='alto'||h.condicion==='moderado'; });
     var imgHEst = hasCritOrAltoCheck ? Math.round(cW * 0.65) : 36;
     var neededH = imgHEst + 14 + halls.length * 9 + 8;
     if (y + neededH > 280) { doc.addPage(); y = 14; }
@@ -3385,7 +3432,7 @@ function pdfGrupo(doc, grupo, tipo, W, margin, cW) {
     var textW = cW - imgW - 4;
 
     // Fotos CRÍTICO o ALTO: tamaño grande (full width), resto: miniatura
-    var hasCritOrAlto = halls.some(function(h){ return h.condicion==='critico'||h.condicion==='alto'; });
+    var hasCritOrAlto = halls.some(function(h){ return h.condicion==='critico'||h.condicion==='alto'||h.condicion==='moderado'; });
     if (hasCritOrAlto) { imgW = cW; imgH = Math.round(imgW * 0.65); textX = imgX; textW = cW; }
 
     var pdfImgSrc = f.pdfImgBase64 || f.viewBase64 || f.thumbBase64;
@@ -3441,7 +3488,7 @@ function pdfGrupo(doc, grupo, tipo, W, margin, cW) {
     }
 
     // Nombre y GPS
-    var hasCritOrAlto2 = halls.some(function(h){ return h.condicion==='critico'||h.condicion==='alto'; });
+    var hasCritOrAlto2 = halls.some(function(h){ return h.condicion==='critico'||h.condicion==='alto'||h.condicion==='moderado'; });
     var shortName = f.nombre.replace(/^DJI_[0-9]{8}_[0-9]{6}_/, '');
     var metaY = hasCritOrAlto2 ? y+imgH+5 : y+5;
     var metaX = hasCritOrAlto2 ? margin : textX;
@@ -3469,10 +3516,12 @@ function pdfGrupo(doc, grupo, tipo, W, margin, cW) {
         pdfRect(doc, textX, hy-2, 3, 7, col);
         // Código
         pdfText(doc, h.codigo, textX+5, hy+3, { size:7, style:'bold', color:col });
-        // Condición
-        pdfRect(doc, textX+10, hy, 18, 5.5, col);
-        pdfText(doc, COND_LABELS_PDF[h.condicion]||h.condicion.toUpperCase(),
-          textX+11, hy+3.8, { size:5.5, style:'bold', color:[255,255,255] });
+        // Condición — ancho auto según texto para que N/A y OK queden simétricos
+        var lblBadge = COND_LABELS_PDF[h.condicion]||h.condicion.toUpperCase();
+        doc.setFontSize(5.5); doc.setFont('helvetica','bold');
+        var badgeW = Math.max(14, doc.getTextWidth(lblBadge) + 5);
+        pdfRect(doc, textX+10, hy, badgeW, 5.5, col);
+        pdfText(doc, lblBadge, textX+11, hy+3.8, { size:5.5, style:'bold', color:[255,255,255] });
         // Descripción
         var descX = textX + 31;
         var descW = textW - 33;
@@ -4402,7 +4451,8 @@ function dibujarBboxCard(img) {
     ctx.strokeRect(x, y, w, ht);
     // Label
     ctx.font = 'bold 11px Barlow,sans-serif';
-    var label = (h.codigo||'A');
+    var desc = h.descripcion ? h.descripcion.slice(0, 20) + (h.descripcion.length > 20 ? '…' : '') : '';
+    var label = (h.codigo||'?') + (desc ? ' — ' + desc : '');
     var tw = ctx.measureText(label).width + 8;
     ctx.fillStyle = color;
     ctx.fillRect(x, y - 18, tw, 18);
@@ -4573,8 +4623,9 @@ function mostrarPanelGrupoCliente(g) {
         html += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px;background:#f8fafc;border-radius:6px;border-left:3px solid '+cc+';">' +
           '<span style="background:'+cc+';color:#fff;font-size:10px;padding:2px 7px;border-radius:3px;font-weight:700;white-space:nowrap;">'+cl.toUpperCase()+'</span>' +
           '<div style="flex:1;min-width:0;">' +
-            '<div style="font-size:13px;font-weight:600;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(h.descripcion||'—')+'</div>' +
-            (h.comentario ? '<div style="font-size:11px;color:#7a8aaa;margin-top:2px;">'+esc(h.comentario)+'</div>' : '') +
+            '<div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:1px;">'+esc(h.codigo||'')+'</div>' +
+            '<div style="font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;">'+esc(h.descripcion||'—')+'</div>' +
+            (h.comentario ? '<div style="font-size:11px;color:#475569;margin-top:2px;">'+esc(h.comentario)+'</div>' : '') +
           '</div>' +
         '</div>';
       });
