@@ -4691,19 +4691,65 @@ function abrirFotoClienteEvt(el) {
 function abrirFotoCliente(src, hallazgos) {
   var overlay = document.createElement('div');
   overlay.id = 'clienteLightbox';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;';
-  
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;overflow:hidden;';
+
   var COND_COLOR = { ok:'#22c55e', moderado:'#eab308', alto:'#f97316', critico:'#ef4444', 'n/a':'#7a8aaa' };
   var halls = hallazgos || [];
   var hasBboxes = halls.some(function(h){ return h.bbox; });
 
+  // Contenedor zoomable
   var wrap = document.createElement('div');
-  wrap.style.cssText = 'position:relative;max-width:95vw;max-height:90vh;display:flex;align-items:center;justify-content:center;';
+  wrap.style.cssText = 'position:relative;transform-origin:center center;cursor:grab;user-select:none;';
 
   var img = document.createElement('img');
   img.src = src;
-  img.style.cssText = 'max-width:95vw;max-height:90vh;object-fit:contain;border-radius:4px;display:block;';
+  img.style.cssText = 'max-width:95vw;max-height:90vh;object-fit:contain;border-radius:4px;display:block;pointer-events:none;';
   wrap.appendChild(img);
+
+  // Estado de zoom y pan
+  var scale = 1, minScale = 1, maxScale = 5;
+  var panX = 0, panY = 0;
+  var isDragging = false, dragStartX = 0, dragStartY = 0, panStartX = 0, panStartY = 0;
+
+  function applyTransform() {
+    wrap.style.transform = 'translate('+panX+'px, '+panY+'px) scale('+scale+')';
+  }
+
+  // Zoom con rueda del mouse
+  overlay.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    var delta = e.deltaY > 0 ? 0.85 : 1.18;
+    var newScale = Math.min(maxScale, Math.max(minScale, scale * delta));
+    // Zoom centrado en posición del mouse
+    var rect = wrap.getBoundingClientRect();
+    var mx = e.clientX - rect.left - rect.width/2;
+    var my = e.clientY - rect.top - rect.height/2;
+    panX += mx * (1 - newScale/scale);
+    panY += my * (1 - newScale/scale);
+    scale = newScale;
+    if (scale === minScale) { panX = 0; panY = 0; }
+    wrap.style.cursor = scale > 1 ? 'grab' : 'default';
+    applyTransform();
+  }, { passive: false });
+
+  // Pan con drag (mouse)
+  wrap.addEventListener('mousedown', function(e) {
+    if (scale <= 1) { return; }
+    isDragging = true;
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    panStartX = panX; panStartY = panY;
+    wrap.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', function(e) {
+    if (!isDragging) { return; }
+    panX = panStartX + (e.clientX - dragStartX);
+    panY = panStartY + (e.clientY - dragStartY);
+    applyTransform();
+  });
+  window.addEventListener('mouseup', function() {
+    if (isDragging) { isDragging = false; wrap.style.cursor = scale > 1 ? 'grab' : 'default'; }
+  });
 
   // Botón cerrar
   var btnClose = document.createElement('div');
@@ -4711,6 +4757,21 @@ function abrirFotoCliente(src, hallazgos) {
   btnClose.style.cssText = 'position:fixed;top:16px;right:20px;color:#fff;font-size:28px;cursor:pointer;opacity:0.8;z-index:10000;line-height:1;';
   btnClose.onclick = function(){ document.body.removeChild(overlay); };
   overlay.appendChild(btnClose);
+
+  // Indicador de zoom (desktop)
+  var zoomHint = document.createElement('div');
+  zoomHint.innerHTML = '🔍 Scroll para hacer zoom · Arrastrá para mover';
+  zoomHint.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.6);font-size:12px;font-family:Barlow,sans-serif;pointer-events:none;white-space:nowrap;';
+  overlay.appendChild(zoomHint);
+  // Ocultar hint en mobile
+  if ('ontouchstart' in window) { zoomHint.style.display = 'none'; }
+
+  // Botón reset zoom
+  var btnReset = document.createElement('div');
+  btnReset.innerHTML = '⊙ 1:1';
+  btnReset.style.cssText = 'position:fixed;bottom:20px;right:20px;color:#fff;font-size:12px;font-family:Barlow,sans-serif;background:rgba(255,255,255,0.15);padding:5px 10px;border-radius:4px;cursor:pointer;z-index:10000;';
+  btnReset.onclick = function(){ scale=1; panX=0; panY=0; wrap.style.cursor='default'; applyTransform(); };
+  overlay.appendChild(btnReset);
 
   // Dibujar bboxes cuando la imagen cargue
   if (hasBboxes) {
@@ -4728,22 +4789,20 @@ function abrirFotoCliente(src, hallazgos) {
         var y  = h.bbox.y * imgRect.height;
         var w  = h.bbox.w * imgRect.width;
         var ht = h.bbox.h * imgRect.height;
-        // Rect
         ctx.strokeStyle = color;
         ctx.lineWidth   = 3;
         ctx.strokeRect(x, y, w, ht);
-        // Etiqueta código
         ctx.fillStyle = color;
-        var label = (h.codigo||'') + (h.condicion ? ' · '+(h.condicion).toUpperCase() : '');
+        var desc = h.descripcion ? ' — '+h.descripcion.slice(0,22) : '';
+        var label = (h.codigo||'') + desc;
+        ctx.font = 'bold 12px Barlow, sans-serif';
         var tw = ctx.measureText(label).width + 10;
         ctx.fillRect(x, y - 20, tw, 20);
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 12px Barlow, sans-serif';
         ctx.fillText(label, x + 5, y - 6);
       });
       wrap.appendChild(canvas);
     };
-    // Si ya estaba cacheada
     if (img.complete) { img.onload(); }
   }
 
