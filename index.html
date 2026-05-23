@@ -4732,42 +4732,6 @@ function mostrarPanelGrupoCliente(g) {
     html += '<div style="text-align:center;color:#7a8aaa;padding:24px 0;font-size:13px;">Sin imágenes en este grupo</div>';
   }
 
-  // Videos del grupo
-  var gVideosC = (g.videos||[]);
-  if (gVideosC.length > 0) {
-    html += '<div style="padding:10px 10px 4px;border-top:1px solid #253050;margin-top:4px;">'
-      + '<div style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">🎥 Videos del grupo</div>';
-    gVideosC.forEach(function(v) {
-      var vUrl = null;
-      if (sb) {
-        var vPath = v.storagePathVideo || (v.id ? v.id+'/video.mp4' : null);
-        if (vPath) { vUrl = sb.storage.from('pewma-fotos').getPublicUrl(vPath).data.publicUrl; }
-      }
-      var dur = v.duracion ? (Math.floor(v.duracion/60)+':'+(Math.round(v.duracion%60)<10?'0':'')+Math.round(v.duracion%60)) : '';
-      var sz  = v.tamano ? (v.tamano>1048576 ? Math.round(v.tamano/1048576)+'MB' : Math.round(v.tamano/1024)+'KB') : '';
-      html += '<div style="border:1px solid #253050;border-radius:8px;overflow:hidden;background:#1a2540;margin-bottom:8px;">';
-      if (vUrl) {
-        html += '<video controls preload="metadata" style="width:100%;max-height:220px;background:#000;display:block;"'
-          + ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
-          + '<source src="'+vUrl+'" type="video/mp4"></video>'
-          + '<div style="display:none;align-items:center;justify-content:center;height:80px;color:#7a8aaa;font-size:13px;flex-direction:column;gap:8px;">'
-          + '<span>⚠️ No se puede reproducir</span>'
-          + '<a href="'+vUrl+'" download style="color:#1565c0;font-size:12px;text-decoration:none;">⬇ Descargar video</a>'
-          + '</div>';
-      } else {
-        html += '<div style="display:flex;align-items:center;justify-content:center;height:80px;color:#7a8aaa;font-size:13px;">Sin URL disponible</div>';
-      }
-      html += '<div style="padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">'
-        + '<div style="min-width:0;">'
-        + '<div style="font-size:11px;color:#b0bec5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:JetBrains Mono,monospace;">'+esc(v.nombre||v.id)+'</div>'
-        + (dur||sz ? '<div style="font-size:10px;color:#7a8aaa;margin-top:2px;">'+(dur?'⏱ '+dur:'')+(dur&&sz?' · ':'')+(sz?sz:'')+'</div>' : '')
-        + '</div>'
-        + (vUrl ? '<a href="'+vUrl+'" download title="Descargar" style="color:#7a8aaa;font-size:18px;text-decoration:none;flex-shrink:0;">⬇</a>' : '')
-        + '</div>';
-      html += '</div>';
-    });
-    html += '</div>';
-  }
 
   html += '</div></div>';
   panel.style.alignItems = 'flex-start';
