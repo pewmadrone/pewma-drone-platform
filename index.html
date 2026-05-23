@@ -1189,23 +1189,52 @@ var TAXONOMIAS = {
   },
   topo:{ icon:'📐', label:'Topografía',
     grupos:[
-      { grupo:'T — Relevamiento', codigos:[
-        {cod:'T01', desc:'Zona sin cobertura de puntos'},
-        {cod:'T02', desc:'Error de GCP o referencia'}
+      { grupo:'R — Relevamiento / Cobertura', codigos:[
+        {cod:'R01', desc:'Zona sin cobertura de imágenes (gap en vuelo)'},
+        {cod:'R02', desc:'Solapamiento insuficiente en sector crítico'},
+        {cod:'R03', desc:'Imagen borrosa o con motion blur inutilizable'}
       ]},
-      { grupo:'G — Terreno', codigos:[
-        {cod:'G01', desc:'Erosión o movimiento de suelo'},
-        {cod:'G02', desc:'Obstáculo para el vuelo'}
+      { grupo:'G — GCP / Referencia', codigos:[
+        {cod:'G01', desc:'GCP con señal GNSS degradada o inestable'},
+        {cod:'G02', desc:'GCP mal posicionado o fuera del área de interés'},
+        {cod:'G03', desc:'Cantidad insuficiente de GCPs para el terreno'}
+      ]},
+      { grupo:'T — Terreno / Obstrucción', codigos:[
+        {cod:'T01', desc:'Vegetación alta que oculta terreno real (DSM ≠ DTM)'},
+        {cod:'T02', desc:'Obstáculo que interrumpe la traza de vuelo'},
+        {cod:'T03', desc:'Zona con sombra que afecta calidad de imagen'},
+        {cod:'T04', desc:'Superficie de agua que impide reconstrucción 3D'}
+      ]},
+      { grupo:'E — Erosión / Geomorfología', codigos:[
+        {cod:'E01', desc:'Erosión activa o cárcava relevante'},
+        {cod:'E02', desc:'Movimiento de suelo o desmoronamiento'},
+        {cod:'E03', desc:'Acumulación de sedimento en zona crítica'}
       ]}
     ],
     codigos: function(){ return this.grupos.reduce(function(a,g){ return a.concat(g.codigos); },[]); }
   },
   industrial:{ icon:'🏭', label:'Industrial',
     grupos:[
-      { grupo:'I — Infraestructura', codigos:[
-        {cod:'I01', desc:'Corrosión en estructura'},
-        {cod:'I02', desc:'Anomalía térmica en equipo'},
-        {cod:'I03', desc:'Daño en cubierta o revestimiento'}
+      { grupo:'C — Corrosión / Revestimiento', codigos:[
+        {cod:'C01', desc:'Corrosión en estructura metálica o caño'},
+        {cod:'C02', desc:'Daño o pérdida de pintura / revestimiento'},
+        {cod:'C03', desc:'Corrosión en rack o soporte de cañerías'}
+      ]},
+      { grupo:'T — Térmica / Anomalías de proceso', codigos:[
+        {cod:'T01', desc:'Punto caliente en equipo eléctrico o motor'},
+        {cod:'T02', desc:'Anomalía térmica en línea de vapor o proceso'},
+        {cod:'T03', desc:'Falla de aislamiento en cañería (pérdida de calor)'},
+        {cod:'T04', desc:'Anomalía en antorcha / flare stack'}
+      ]},
+      { grupo:'E — Estructura', codigos:[
+        {cod:'E01', desc:'Deformación estructural visible'},
+        {cod:'E02', desc:'Fisura o daño en cubierta / techo'},
+        {cod:'E03', desc:'Elemento suelto o con riesgo de caída'}
+      ]},
+      { grupo:'S — Seguridad / Acceso', codigos:[
+        {cod:'S01', desc:'Señalización de seguridad faltante o ilegible'},
+        {cod:'S02', desc:'Cerca o barrera perimetral dañada'},
+        {cod:'S03', desc:'Derrame o mancha en piso de instalación'}
       ]}
     ],
     codigos: function(){ return this.grupos.reduce(function(a,g){ return a.concat(g.codigos); },[]); }
@@ -4285,21 +4314,28 @@ function construirVistaCliente(p) {
       '@media(max-width:768px){' +
         '#cSidebar{display:none!important}' +
         '#cPanel{width:100%!important;position:fixed!important;bottom:0;left:0;right:0;height:52vh;z-index:500;border-radius:12px 12px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,0.4);}' +
+        '#cTopbar{height:auto!important;padding:10px 12px!important;flex-wrap:wrap;gap:8px!important;}' +
+        '#cTopbar img{height:24px!important;}' +
+        '#cTopbarSep{display:none!important;}' +
+        '#cTopbarInfo .ct-tipo{font-size:9px!important;}' +
+        '#cTopbarInfo .ct-nombre{font-size:16px!important;}' +
+        '#cTopbarInfo .ct-sub{font-size:12px!important;}' +
+        '#cTopbarStats{display:none!important;}' +
       '}' +
     '</style>' +
     '<div style="display:flex;flex-direction:column;height:100vh;font-family:Barlow,sans-serif;background:#0c1220;">' +
-      '<div style="background:#131c2e;border-bottom:1px solid #253050;padding:0 16px;display:flex;align-items:center;gap:14px;height:52px;flex-shrink:0;">' +
+      '<div id="cTopbar" style="background:#131c2e;border-bottom:1px solid #253050;padding:0 16px;display:flex;align-items:center;gap:14px;height:52px;flex-shrink:0;">' +
         '<img src="'+PEWMA_LOGO_B64+'" style="height:30px;object-fit:contain;" alt="Pewma Drone">' +
-        '<div style="width:1px;height:26px;background:#253050;"></div>' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;">'+esc(tax.label)+'</div>' +
-          '<div style="font-size:14px;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(p.nombre)+'</div>' +
-          '<div style="font-size:11px;color:#7a8aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+
+        '<div id="cTopbarSep" style="width:1px;height:26px;background:#253050;"></div>' +
+        '<div id="cTopbarInfo" style="flex:1;min-width:0;">' +
+          '<div class="ct-tipo" style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;">'+esc(tax.label)+'</div>' +
+          '<div class="ct-nombre" style="font-size:14px;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(p.nombre)+'</div>' +
+          '<div class="ct-sub" style="font-size:11px;color:#b0bec5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+
             esc(p.cliente||'') +
             (p.fechaVuelo ? ' · ' + new Date(p.fechaVuelo+'T12:00:00').toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}) : '') +
           '</div>' +
         '</div>' +
-        '<div style="display:flex;gap:14px;flex-shrink:0;">' +
+        '<div id="cTopbarStats" style="display:flex;gap:14px;flex-shrink:0;">' +
           '<div style="text-align:center;"><div style="font-size:15px;font-weight:700;color:#e6edf3;">'+totalHalls+'</div><div style="font-size:9px;color:#7a8aaa;">HALLAZGOS</div></div>' +
           '<div style="text-align:center;"><div style="font-size:15px;font-weight:700;color:#ef4444;">'+criticos+'</div><div style="font-size:9px;color:#7a8aaa;">CRÍTICOS</div></div>' +
           '<div style="text-align:center;"><div style="font-size:15px;font-weight:700;color:#f97316;">'+altos+'</div><div style="font-size:9px;color:#7a8aaa;">ALTOS</div></div>' +
