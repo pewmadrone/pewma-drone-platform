@@ -669,6 +669,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
         <span id="autosaveLabel">Guardado</span>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="guardarProyecto()">💾 Guardar</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportarCSV()">📊 CSV</button>
       <button class="btn btn-primary btn-sm" onclick="abrirModalPDF()">📄 Generar PDF</button>
     </div>
   </div>
@@ -3064,6 +3065,78 @@ function eliminarVideo(gid, vid_id) {
 // PDF — MODAL
 // ══════════════════════════════════════════════
 var pdfTipoActual = 'completo';
+
+function exportarCSV() {
+  if (!proyectoActual) { mostrarToast('Abrí un proyecto primero','⚠️'); return; }
+
+  var COND_LABELS = { na:'No aplica', ok:'OK', moderado:'Moderado', alto:'Alto', critico:'Crítico' };
+
+  // Encabezado
+  var rows = [
+    ['Proyecto', 'Cliente', 'Tipo', 'Fecha Vuelo', 'Grupo', 'Foto', 'Tipo Imagen',
+     'GPS Lat', 'GPS Lng', 'Altitud (m)', 'Código', 'Descripción', 'Condición', 'Comentario']
+  ];
+
+  var proyecto  = proyectoActual.nombre  || '';
+  var cliente   = proyectoActual.cliente || '';
+  var tipo      = proyectoActual.tipo    || '';
+  var fecha     = proyectoActual.fechaVuelo || '';
+
+  var totalHalls = 0;
+
+  (proyectoActual.grupos||[]).forEach(function(g) {
+    (g.fotos||[]).forEach(function(f) {
+      var halls = f.hallazgos || [];
+      if (halls.length === 0) {
+        // Foto sin hallazgos — igual la incluimos con fila vacía
+        rows.push([
+          proyecto, cliente, tipo, fecha,
+          g.nombre, f.nombre, f.tipoM4T||'V',
+          f.lat != null ? f.lat.toFixed(6) : '',
+          f.lng != null ? f.lng.toFixed(6) : '',
+          f.alt != null ? f.alt.toFixed(1) : '',
+          '', '', '', ''
+        ]);
+      } else {
+        halls.forEach(function(h) {
+          totalHalls++;
+          rows.push([
+            proyecto, cliente, tipo, fecha,
+            g.nombre, f.nombre, f.tipoM4T||'V',
+            f.lat != null ? f.lat.toFixed(6) : '',
+            f.lng != null ? f.lng.toFixed(6) : '',
+            f.alt != null ? f.alt.toFixed(1) : '',
+            h.codigo     || '',
+            h.descripcion|| '',
+            COND_LABELS[h.condicion] || h.condicion || '',
+            h.comentario || ''
+          ]);
+        });
+      }
+    });
+  });
+
+  // Construir CSV con separador ; (compatible con Excel en español)
+  var csv = rows.map(function(row) {
+    return row.map(function(cell) {
+      var val = String(cell).replace(/"/g, '""');
+      return (val.indexOf(';') >= 0 || val.indexOf('"') >= 0 || val.indexOf('\n') >= 0)
+        ? '"' + val + '"' : val;
+    }).join(';');
+  }).join('\r\n');
+
+  // BOM para que Excel lo abra correctamente en español
+  var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  var fname = 'Pewma_Drone_' + (proyectoActual.nombre||'proyecto').replace(/\s+/g,'_') + '_hallazgos.csv';
+  a.href = url; a.download = fname; a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+
+  mostrarToast(totalHalls + ' hallazgos exportados a CSV 📊', '📊');
+}
 
 function abrirModalPDF() {
   if (!proyectoActual) { mostrarToast('Abrí un proyecto primero','⚠️'); return; }
