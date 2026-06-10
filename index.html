@@ -670,6 +670,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
       </div>
       <button class="btn btn-secondary btn-sm" onclick="guardarProyecto()">💾 Guardar</button>
       <button class="btn btn-secondary btn-sm" onclick="exportarCSV()">📊 CSV</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportarKML()">🗺 KML</button>
       <button class="btn btn-primary btn-sm" onclick="abrirModalPDF()">📄 Generar PDF</button>
     </div>
   </div>
@@ -3066,6 +3067,100 @@ function eliminarVideo(gid, vid_id) {
 // ══════════════════════════════════════════════
 var pdfTipoActual = 'completo';
 
+function exportarKML() {
+  if (!proyectoActual) { mostrarToast('Abrí un proyecto primero','⚠️'); return; }
+
+  var COND_LABEL = { na:'No aplica', ok:'OK', moderado:'Moderado', alto:'Alto', critico:'Crítico' };
+  var COND_COLOR = { critico:'ff0000ff', alto:'ff6600ff', moderado:'ff8800ff', ok:'ff00aa00', na:'ffaaaaaa' };
+  var COND_ICON  = { critico:'http://maps.google.com/mapfiles/kml/paddle/red-circle.png',
+                     alto:   'http://maps.google.com/mapfiles/kml/paddle/orange-circle.png',
+                     moderado:'http://maps.google.com/mapfiles/kml/paddle/ylw-circle.png',
+                     ok:     'http://maps.google.com/mapfiles/kml/paddle/grn-circle.png',
+                     na:     'http://maps.google.com/mapfiles/kml/paddle/wht-circle.png' };
+
+  var nombre   = proyectoActual.nombre  || 'Inspección';
+  var cliente  = proyectoActual.cliente || '';
+  var fecha    = proyectoActual.fechaVuelo || new Date().toISOString().slice(0,10);
+  var tax      = (window.TAXONOMIAS && TAXONOMIAS[proyectoActual.tipo]) ? TAXONOMIAS[proyectoActual.tipo] : { label: proyectoActual.tipo || '' };
+
+  var placemarks = '';
+  var totalGrupos = 0;
+
+  (proyectoActual.grupos||[]).forEach(function(g) {
+    if (!g.lat || !g.lng) { return; }
+    totalGrupos++;
+
+    // Severidad máxima del grupo
+    var sevMax = 'na';
+    var hallazgos = [];
+    (g.fotos||[]).forEach(function(f) {
+      (f.hallazgos||[]).forEach(function(h) {
+        hallazgos.push(h);
+        var s = h.condicion;
+        if (s==='critico') { sevMax='critico'; }
+        else if (s==='alto'     && sevMax!=='critico')                    { sevMax='alto'; }
+        else if (s==='moderado' && sevMax!=='critico' && sevMax!=='alto') { sevMax='moderado'; }
+        else if (s==='ok'       && sevMax==='na')                         { sevMax='ok'; }
+      });
+    });
+
+    // Descripción HTML dentro del popup de Google Earth
+    var desc = '<![CDATA[';
+    desc += '<b>' + g.nombre + '</b><br>';
+    desc += (tax.label||'') + ' · ' + fecha + '<br>';
+    if (cliente) { desc += 'Cliente: ' + cliente + '<br>'; }
+    desc += 'GPS: ' + g.lat.toFixed(6) + ', ' + g.lng.toFixed(6) + '<br>';
+    if (g.alt) { desc += 'Altitud: ' + g.alt.toFixed(0) + ' m<br>'; }
+    desc += '<br><b>Hallazgos (' + hallazgos.length + '):</b><br>';
+    hallazgos.forEach(function(h) {
+      desc += '• [' + (h.codigo||'—') + '] ' + (h.descripcion||'') + ' — ' + (COND_LABEL[h.condicion]||h.condicion||'') + '<br>';
+    });
+    var mapsUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + g.lat + ',' + g.lng;
+    desc += '<br><a href="' + mapsUrl + '">📍 Cómo llegar (Google Maps)</a>';
+    desc += ']]>';
+
+    placemarks +=
+      '  <Placemark>\n' +
+      '    <name>' + esc(g.nombre) + '</name>\n' +
+      '    <description>' + desc + '</description>\n' +
+      '    <Style>\n' +
+      '      <IconStyle>\n' +
+      '        <color>' + (COND_COLOR[sevMax]||'ffaaaaaa') + '</color>\n' +
+      '        <scale>1.2</scale>\n' +
+      '        <Icon><href>' + (COND_ICON[sevMax]||COND_ICON.na) + '</href></Icon>\n' +
+      '      </IconStyle>\n' +
+      '      <LabelStyle><scale>0.8</scale></LabelStyle>\n' +
+      '    </Style>\n' +
+      '    <Point><coordinates>' + g.lng.toFixed(6) + ',' + g.lat.toFixed(6) + ',' + (g.alt||0).toFixed(0) + '</coordinates></Point>\n' +
+      '  </Placemark>\n';
+  });
+
+  if (totalGrupos === 0) {
+    mostrarToast('No hay grupos con GPS para exportar','⚠️');
+    return;
+  }
+
+  var kml =
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<kml xmlns="http://www.opengis.net/kml/2.2">\n' +
+    '<Document>\n' +
+    '  <name>' + esc(nombre) + '</name>\n' +
+    '  <description>Inspección RPA · Pewma Drone · ' + fecha + '</description>\n' +
+    placemarks +
+    '</Document>\n' +
+    '</kml>';
+
+  var blob  = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+  var url   = URL.createObjectURL(blob);
+  var a     = document.createElement('a');
+  var fname = 'Pewma_Drone_' + (proyectoActual.nombre||'proyecto').replace(/\s+/g,'_') + '.kml';
+  a.href = url; a.download = fname; a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+  mostrarToast(totalGrupos + ' grupos exportados a KML 🗺', '🗺');
+}
+
 function exportarCSV() {
   if (!proyectoActual) { mostrarToast('Abrí un proyecto primero','⚠️'); return; }
 
@@ -4392,7 +4487,17 @@ function iniciarModoCliente(pid) {
   document.body.innerHTML = construirVistaCliente(proyectoActual);
 
   // Inicializar mapa Leaflet en la vista cliente
-  setTimeout(function() { inicializarMapaCliente(); }, 200);
+  setTimeout(function() {
+    inicializarMapaCliente();
+    try {
+      if (localStorage.getItem('pewma_cliente_tema') === 'light') {
+        var root = document.getElementById('clienteRoot');
+        var btn  = document.getElementById('btnToggleTema');
+        if (root) { root.classList.add('cl-light'); }
+        if (btn)  { btn.textContent = '☀️'; }
+      }
+    } catch(e) {}
+  }, 200);
 }
 
 function construirVistaCliente(p) {
@@ -4425,8 +4530,8 @@ function construirVistaCliente(p) {
       '<div class="cg-item" id="cg-'+gi+'" onclick="selGrupoCliente('+gi+')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px;">' +
         '<div style="width:10px;height:10px;border-radius:50%;background:'+dotColor+';flex-shrink:0;"></div>' +
         '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:13px;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(g.nombre)+'</div>' +
-          '<div style="font-size:11px;color:#b0bec5;margin-top:1px;">'+(g.fotos||[]).length+' fotos · '+hallCount+' hallazgos</div>' +
+          '<div style="font-size:13px;font-weight:700;color:var(--cr-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(g.nombre)+'</div>' +
+          '<div style="font-size:11px;color:var(--cr-sub);margin-top:1px;">'+(g.fotos||[]).length+' fotos · '+hallCount+' hallazgos</div>' +
         '</div>' +
         (maxSev ? '<span style="background:'+dotColor+';color:#fff;font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;flex-shrink:0;">'+maxSev.toUpperCase()+'</span>' : '') +
       '</div>';
@@ -4434,12 +4539,18 @@ function construirVistaCliente(p) {
 
   return (
     '<style>' +
+      ':root{--cr-bg:#0c1220;--cr-surf:#131c2e;--cr-surf2:#1a2540;--cr-bord:#253050;--cr-text:#e6edf3;--cr-muted:#7a8aaa;--cr-sub:#b0bec5;}' +
+      '.cl-light{--cr-bg:#f1f5f9;--cr-surf:#ffffff;--cr-surf2:#f8fafc;--cr-bord:#e2e8f0;--cr-text:#0f172a;--cr-muted:#64748b;--cr-sub:#475569;}' +
       'body{margin:0;overflow:hidden}' +
       '.cg-item:hover{background:rgba(255,255,255,0.06)!important}' +
+      '.cl-light .cg-item:hover{background:rgba(0,0,0,0.04)!important}' +
       '.cg-item.activo{background:rgba(21,101,192,0.25)!important;border-left:3px solid #1565c0}' +
-      '.pewma-popup .leaflet-popup-content-wrapper{background:#1a2540;border:1px solid #253050;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.5);color:#e6edf3;}' +
-      '.pewma-popup .leaflet-popup-tip{background:#1a2540;}' +
-      '.pewma-popup .leaflet-popup-close-button{color:#7a8aaa!important;font-size:18px!important;top:6px!important;right:8px!important;}' +
+      '.cl-light .cg-item.activo{background:rgba(21,101,192,0.12)!important}' +
+      '.pewma-popup .leaflet-popup-content-wrapper{background:var(--cr-surf2);border:1px solid var(--cr-bord);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.2);color:var(--cr-text);}' +
+      '.pewma-popup .leaflet-popup-tip{background:var(--cr-surf2);}' +
+      '.pewma-popup .leaflet-popup-close-button{color:var(--cr-muted)!important;font-size:18px!important;top:6px!important;right:8px!important;}' +
+      '#btnToggleTema{background:transparent;border:1px solid var(--cr-bord);border-radius:6px;color:var(--cr-muted);cursor:pointer;font-size:16px;padding:4px 8px;transition:all .2s;line-height:1;}' +
+      '#btnToggleTema:hover{background:var(--cr-surf2);color:var(--cr-text);}' +
       '@media(max-width:768px){' +
         '#cSidebar{display:none!important}' +
         '#cPanel{width:100%!important;position:fixed!important;bottom:0;left:0;right:0;height:52vh;z-index:500;border-radius:12px 12px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,0.4);}' +
@@ -4452,14 +4563,14 @@ function construirVistaCliente(p) {
         '#cTopbarStats{display:none!important;}' +
       '}' +
     '</style>' +
-    '<div style="display:flex;flex-direction:column;height:100vh;font-family:Barlow,sans-serif;background:#0c1220;">' +
-      '<div id="cTopbar" style="background:#131c2e;border-bottom:1px solid #253050;padding:0 16px;display:flex;align-items:center;gap:14px;height:52px;flex-shrink:0;">' +
+    '<div id="clienteRoot" style="display:flex;flex-direction:column;height:100vh;font-family:Barlow,sans-serif;background:var(--cr-bg);color:var(--cr-text);">' +
+      '<div id="cTopbar" style="background:var(--cr-surf);border-bottom:1px solid var(--cr-bord);padding:0 16px;display:flex;align-items:center;gap:14px;height:52px;flex-shrink:0;">' +
         '<img src="'+PEWMA_LOGO_B64+'" style="height:30px;object-fit:contain;" alt="Pewma Drone">' +
         '<div id="cTopbarSep" style="width:1px;height:26px;background:#253050;"></div>' +
         '<div id="cTopbarInfo" style="flex:1;min-width:0;">' +
-          '<div class="ct-tipo" style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;">'+esc(tax.label)+'</div>' +
-          '<div class="ct-nombre" style="font-size:14px;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(p.nombre)+'</div>' +
-          '<div class="ct-sub" style="font-size:11px;color:#b0bec5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+
+          '<div class="ct-tipo" style="font-size:10px;color:var(--cr-muted);letter-spacing:1px;text-transform:uppercase;">'+esc(tax.label)+'</div>' +
+          '<div class="ct-nombre" style="font-size:14px;font-weight:700;color:var(--cr-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(p.nombre)+'</div>' +
+          '<div class="ct-sub" style="font-size:11px;color:var(--cr-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+
             esc(p.cliente||'') +
             (p.fechaVuelo ? ' · ' + new Date(p.fechaVuelo+'T12:00:00').toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}) : '') +
           '</div>' +
@@ -4468,24 +4579,25 @@ function construirVistaCliente(p) {
           '<div style="text-align:center;"><div style="font-size:15px;font-weight:700;color:#e6edf3;">'+totalHalls+'</div><div style="font-size:9px;color:#7a8aaa;">HALLAZGOS</div></div>' +
           '<div style="text-align:center;"><div style="font-size:15px;font-weight:700;color:#ef4444;">'+criticos+'</div><div style="font-size:9px;color:#7a8aaa;">CRÍTICOS</div></div>' +
           '<div style="text-align:center;"><div style="font-size:15px;font-weight:700;color:#f97316;">'+altos+'</div><div style="font-size:9px;color:#7a8aaa;">ALTOS</div></div>' +
+        '<button id="btnToggleTema" onclick="toggleClienteTema()" title="Cambiar tema">🌙</button>' +
         '</div>' +
       '</div>' +
       '<div style="display:flex;flex:1;min-height:0;">' +
-        '<div id="cSidebar" style="width:210px;background:#131c2e;border-right:1px solid #253050;overflow-y:auto;flex-shrink:0;">' +
-          '<div style="padding:8px 14px 4px;font-size:10px;color:#7a8aaa;letter-spacing:1.5px;text-transform:uppercase;">'+((p.grupos||[]).length)+' GRUPOS</div>' +
+        '<div id="cSidebar" style="width:210px;background:var(--cr-surf);border-right:1px solid var(--cr-bord);overflow-y:auto;flex-shrink:0;">' +
+          '<div style="padding:8px 14px 4px;font-size:10px;color:var(--cr-muted);letter-spacing:1.5px;text-transform:uppercase;">'+((p.grupos||[]).length)+' GRUPOS</div>' +
           sidebarGrupos +
         '</div>' +
         '<div id="cMapa" style="flex:1.8;min-width:280px;"></div>' +
-        '<div id="cPanel" style="flex:1;min-width:260px;max-width:420px;background:#131c2e;border-left:1px solid #253050;overflow-y:auto;display:flex;align-items:flex-start;justify-content:flex-start;flex-direction:column;">' +
-          '<div style="text-align:center;color:#7a8aaa;padding:32px;">' +
+        '<div id="cPanel" style="flex:1;min-width:260px;max-width:420px;background:var(--cr-surf);border-left:1px solid var(--cr-bord);overflow-y:auto;display:flex;align-items:flex-start;justify-content:flex-start;flex-direction:column;">' +
+          '<div style="text-align:center;color:var(--cr-muted);padding:32px;">' +
             '<div style="font-size:36px;margin-bottom:12px;">📍</div>' +
             '<div style="font-size:13px;">Seleccioná un grupo del sidebar o tocá un punto del mapa</div>' +
           '</div>' +
         '</div>' +
       '</div>' +
-      '<div style="background:#0c1220;border-top:1px solid #253050;padding:6px 16px;display:flex;justify-content:space-between;flex-shrink:0;">' +
-        '<div style="font-size:11px;color:#7a8aaa;">Pewma Drone · pewmadrone.com</div>' +
-        '<div style="font-size:11px;color:#7a8aaa;">Solo lectura · Confidencial</div>' +
+      '<div style="background:var(--cr-bg);border-top:1px solid var(--cr-bord);padding:6px 16px;display:flex;justify-content:space-between;flex-shrink:0;">' +
+        '<div style="font-size:11px;color:var(--cr-muted);">Pewma Drone · pewmadrone.com</div>' +
+        '<div style="font-size:11px;color:var(--cr-muted);">Solo lectura · Confidencial</div>' +
       '</div>' +
     '</div>'
   );
@@ -4628,6 +4740,18 @@ function dibujarBboxCard(img) {
   });
 }
 
+function toggleClienteTema() {
+  var root = document.getElementById('clienteRoot');
+  var btn  = document.getElementById('btnToggleTema');
+  if (!root) { return; }
+  var isLight = root.classList.toggle('cl-light');
+  if (btn) { btn.textContent = isLight ? '☀️' : '🌙'; }
+  try { localStorage.setItem('pewma_cliente_tema', isLight ? 'light' : 'dark'); } catch(e) {}
+  // Re-render panel activo con nuevo tema
+  var activo = document.querySelector('.cg-item.activo');
+  if (activo) { var gi = parseInt(activo.id.replace('cg-','')); selGrupoCliente(gi); }
+}
+
 function selGrupoClientePopup(gi) {
   // Cerrar todos los popups del mapa
   document.querySelectorAll('.leaflet-popup-close-button').forEach(function(b){ b.click(); });
@@ -4686,15 +4810,21 @@ function inicializarMapaCliente() {
     var gIdx = (proyectoActual.grupos||[]).indexOf(g);
     var gHalls = 0;
     (g.fotos||[]).forEach(function(f){ gHalls += (f.hallazgos||[]).length; });
+    var mapsUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + g.lat + ',' + g.lng;
     var popupHtml =
-      '<div style="font-family:Barlow,sans-serif;min-width:160px;">' +
+      '<div style="font-family:Barlow,sans-serif;min-width:190px;">' +
         '<div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#e6edf3;">' + esc(g.nombre) + '</div>' +
-        '<div style="font-size:12px;color:#7a8aaa;margin-bottom:8px;">📷 ' + (g.fotos||[]).length + ' fotos &nbsp; 🔍 ' + gHalls + ' hallazgos</div>' +
-        '<div style="font-size:11px;color:#7a8aaa;margin-bottom:8px;">📍 ' + g.lat.toFixed(5) + ', ' + g.lng.toFixed(5) + '</div>' +
-        '<button onclick="selGrupoClientePopup(' + gIdx + ')" ' +
-          'style="background:#1565c0;color:#fff;border:none;padding:6px 0;border-radius:4px;font-size:12px;cursor:pointer;width:100%;font-family:Barlow,sans-serif;">Ver detalles →</button>' +
+        '<div style="font-size:12px;color:#7a8aaa;margin-bottom:4px;">📷 ' + (g.fotos||[]).length + ' fotos &nbsp; 🔍 ' + gHalls + ' hallazgos</div>' +
+        '<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;font-family:monospace;">' + g.lat.toFixed(6) + ', ' + g.lng.toFixed(6) + '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:6px;">' +
+          '<button onclick="selGrupoClientePopup(' + gIdx + ')" ' +
+            'style="background:#1565c0;color:#fff;border:none;padding:7px 0;border-radius:4px;font-size:12px;cursor:pointer;width:100%;font-family:Barlow,sans-serif;font-weight:600;">Ver detalles →</button>' +
+          '<a href="' + mapsUrl + '" target="_blank" ' +
+            'style="background:#16a34a;color:#fff;padding:7px 0;border-radius:4px;font-size:12px;cursor:pointer;width:100%;font-family:Barlow,sans-serif;font-weight:600;text-decoration:none;display:block;text-align:center;">📍 Cómo llegar</a>' +
+        '</div>' +
       '</div>';
-    marker.bindPopup(popupHtml, { maxWidth: 220, className: 'pewma-popup' });
+    marker.bindPopup(popupHtml, { maxWidth: 240, className: 'pewma-popup' });
+    marker.on('click', function() { marker.openPopup(); });
     marker.on('click', function() { marker.openPopup(); });
   });
 
@@ -4723,11 +4853,11 @@ function mostrarPanelGrupoCliente(g) {
 
   var gIdx2 = (proyectoActual.grupos||[]).indexOf(g);
   var html = '<div style="padding:0;background:#131c2e;min-height:100%;">' +
-    '<div style="background:#1a2540;padding:12px 16px;border-bottom:1px solid #253050;">' +
+    '<div style="background:var(--cr-surf2);padding:12px 16px;border-bottom:1px solid var(--cr-bord);">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">' +
         '<div style="min-width:0;">' +
-          '<div style="font-size:10px;color:#7a8aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;">' + esc(tax.label||'Grupo') + '</div>' +
-          '<div style="font-size:17px;font-weight:700;color:#e6edf3;">' + esc(g.nombre) + '</div>' +
+          '<div style="font-size:10px;color:var(--cr-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;">' + esc(tax.label||'Grupo') + '</div>' +
+          '<div style="font-size:17px;font-weight:700;color:var(--cr-text);">' + esc(g.nombre) + '</div>' +
           (g.lat ? '<div style="font-size:11px;color:#7a8aaa;margin-top:3px;">'+g.lat.toFixed(5)+', '+g.lng.toFixed(5)+(g.alt?' · '+g.alt.toFixed(1)+'m':'')+'</div>' : '') +
         '</div>' +
         '<button onclick="generarPDFGrupoCliente('+gIdx2+')" style="background:#1565c0;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:Barlow,sans-serif;font-weight:600;margin-top:2px;">📄 PDF</button>' +
@@ -4753,7 +4883,7 @@ function mostrarPanelGrupoCliente(g) {
     if (!imgFullSrc) { imgFullSrc = imgSrc; }
 
     var fHalls = (f.hallazgos||[]);
-    html += '<div style="border:1px solid #253050;border-radius:8px;overflow:hidden;background:#1a2540;">';
+    html += '<div style="border:1px solid var(--cr-bord);border-radius:8px;overflow:hidden;background:var(--cr-surf2);">';
 
     // Foto thumbnail con placeholder si no carga
     if (imgSrc) {
@@ -4773,7 +4903,7 @@ function mostrarPanelGrupoCliente(g) {
     }
 
     html += '<div style="padding:12px;">';
-    html += '<div style="font-size:11px;color:#7a8aaa;margin-bottom:4px;font-family:JetBrains Mono,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(f.nombre||f.id) + '</div>';
+    html += '<div style="font-size:11px;color:var(--cr-muted);margin-bottom:4px;font-family:JetBrains Mono,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(f.nombre||f.id) + '</div>';
 
     if (f.tipo === 'termica') {
       html += '<span style="background:#f97316;color:#fff;font-size:10px;padding:2px 8px;border-radius:3px;font-weight:600;letter-spacing:0.5px;">TÉRMICA</span>';
@@ -4782,7 +4912,7 @@ function mostrarPanelGrupoCliente(g) {
     }
 
     if (fHalls.length === 0) {
-      html += '<div style="color:#7a8aaa;font-size:12px;margin-top:8px;">Sin hallazgos registrados</div>';
+      html += '<div style="color:var(--cr-muted);font-size:12px;margin-top:8px;">Sin hallazgos registrados</div>';
     } else {
       fHalls.forEach(function(h) {
         var cc = COND_COLOR[h.condicion] || '#7a8aaa';
@@ -4802,7 +4932,7 @@ function mostrarPanelGrupoCliente(g) {
   });
 
   if ((g.fotos||[]).length === 0) {
-    html += '<div style="text-align:center;color:#7a8aaa;padding:24px 0;font-size:13px;">Sin imágenes en este grupo</div>';
+    html += '<div style="text-align:center;color:var(--cr-muted);padding:24px 0;font-size:13px;">Sin imágenes en este grupo</div>';
   }
 
   html += '</div></div>';
